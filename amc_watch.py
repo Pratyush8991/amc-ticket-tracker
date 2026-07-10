@@ -28,6 +28,7 @@ import re
 import sys
 import time
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import requests
@@ -155,23 +156,37 @@ def notify(topic, title, message, click_url):
     )
 
 
-def check_all(cfg, state, session, save=True):
+def _fetch_one(st, cfg):
+    """Worker: fetch adjacent pairs for one showtime, using its own Session
+    (requests.Session isn't guaranteed thread-safe, so don't share one)."""
+    sid = str(st["id"])
+    try:
+        with requests.Session() as s:
+            return st, fetch_pairs(sid, cfg, s), None
+    except Exception as e:  # noqa: BLE001 — one bad showtime shouldn't stop others
+        return st, None, e
+
+
+def check_all(cfg, state, save=True):
     topic = os.environ.get("NTFY_TOPIC") or cfg.get("ntfy_topic")
     if not topic:
         sys.exit("No ntfy topic (env NTFY_TOPIC or config.json ntfy_topic).")
     notified = state.setdefault("notified", {})
     changed = False
 
-    for st in cfg["showtimes"]:
+    # Fetch all showtimes concurrently (modest pool: fast, but not a 27-request
+    # burst that trips AMC's WAF). Notify/state handling stays single-threaded.
+    showtimes = cfg["showtimes"]
+    workers = max(1, min(cfg.get("max_workers", 6), len(showtimes)))
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        results = list(ex.map(lambda st: _fetch_one(st, cfg), showtimes))
+
+    for st, pairs, err in results:
         sid = str(st["id"])
         label = st.get("label", sid)
-        url = SEATS_URL.format(id=sid)
-        try:
-            pairs = fetch_pairs(sid, cfg, session)
-        except Exception as e:  # noqa: BLE001 — one bad showtime shouldn't stop others
-            print(f"[warn] {label}: {e}")
+        if err is not None:
+            print(f"[warn] {label}: {err}")
             continue
-
         current = {"-".join(sorted(p)) for p in pairs}
         seen = set(notified.get(sid, []))
         for pair_id in sorted(current - seen):
@@ -180,7 +195,7 @@ def check_all(cfg, state, session, save=True):
                 topic,
                 title=f"2 seats: {label}",
                 message=f"🎬 Seats {pair_id} open for Odyssey 70mm.\nTap to book now.",
-                click_url=url,
+                click_url=SEATS_URL.format(id=sid),
             )
         if seen != current:
             notified[sid] = sorted(current)
@@ -190,7 +205,7 @@ def check_all(cfg, state, session, save=True):
         save_state(state)
 
 
-def run_test(cfg, session):
+def run_test(cfg):
     """Smoke-test the notification path: widen seat types to include the always-
     present Wheelchair/Companion seats so an alert actually fires, hit only the
     first showtime, and never touch saved state."""
@@ -203,27 +218,34 @@ def run_test(cfg, session):
     label = test_cfg["showtimes"][0]["label"] if test_cfg["showtimes"] else "?"
     print(f"[TEST] Widened seat types, checking only: {label}")
     print("[TEST] If any seats are open there, your phone should buzz. State not saved.")
-    check_all(test_cfg, {}, session, save=False)
+    check_all(test_cfg, {}, save=False)
     print("[TEST] Done. If nothing fired, that showtime has no open seats at all "
           "right now — try another as the first entry, or check the NTFY_TOPIC.")
 
 
 def main():
     test = "--test" in sys.argv
+    # --forever: run indefinitely (for launchd/systemd on an always-on machine),
+    # ignoring run_duration_seconds. Default: the timed loop that fits a CI job.
+    forever = "--forever" in sys.argv
     cfg = load_json(CONFIG_PATH, None)
     if cfg is None:
         sys.exit("config.json not found — copy config.example.json and fill it in.")
-    session = requests.Session()
 
     if test:
-        run_test(cfg, session)
+        run_test(cfg)
         return
 
     state = load_json(STATE_PATH, {})
     poll = cfg.get("poll_seconds", 60)
-    deadline = time.time() + cfg.get("run_duration_seconds", 270)
+    deadline = float("inf") if forever else time.time() + cfg.get("run_duration_seconds", 270)
+    if forever:
+        print(f"[forever] watching {len(cfg['showtimes'])} showtimes; poll ~{poll}s. "
+              "Stop with launchctl bootout / Ctrl-C.", flush=True)
     while True:
-        check_all(cfg, state, session)
+        check_all(cfg, state)
+        if forever:
+            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] pass complete", flush=True)
         if time.time() + poll >= deadline:
             break
         time.sleep(poll + random.uniform(-5, 5))

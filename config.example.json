@@ -14,6 +14,9 @@
   "_types_note": "Only these seat types count. CanReserve = standard bookable seat. Excludes Wheelchair/Companion seats, which show as available but shouldn't trigger.",
   "bookable_types": ["CanReserve"],
 
+  "_workers_note": "How many showtimes to fetch in parallel per pass. 6 is fast but not a bursty 27-at-once scrape.",
+  "max_workers": 6,
+
   "showtimes": [
     { "id": "144251502", "label": "TEST — Thu Jul 16, 10:45 PM (IMAX 70mm preview)" },
     { "id": "REPLACE_WITH_ID", "label": "Sun Jul 19, 11:00 PM (IMAX 70mm)" }

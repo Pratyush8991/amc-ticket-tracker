@@ -52,6 +52,24 @@ add the Jul 27 – Aug 1 shows the same way as they open.
 - Kick off a first run: **Actions → AMC seat watch → Run workflow**.
 - Watch it work with the bundled TEST showtime first, then remove that entry.
 
+## Run on an always-on Mac (launchd) — recommended over GitHub cron
+
+GitHub's `schedule` cron is best-effort and can lag 15–40 min or drop runs (no
+plan/runner upgrade fixes this — it's a shared global queue). For catching seats
+that free up and vanish within minutes, run it locally with a true ~60s loop:
+
+1. `which uv` to get the uv path.
+2. Copy `mac/com.prats.amc-ticket-tracker.plist` to
+   `~/Library/LaunchAgents/`, and fill in `__UV_PATH__`, `__REPO_DIR__`,
+   `__HOME__`, `__NTFY_TOPIC__`.
+3. `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.prats.amc-ticket-tracker.plist`
+4. Verify: `launchctl list | grep amc-ticket-tracker` (a PID = running);
+   tail `~/Library/Logs/amc-ticket-tracker.log`.
+
+It runs `amc_watch.py --forever` (infinite loop, ignores `run_duration_seconds`),
+relaunches at login and on crash, and pauses while the Mac sleeps. Restart after
+edits: `launchctl kickstart -k gui/$(id -u)/com.prats.amc-ticket-tracker`.
+
 ## Local run / VPS (more reliable than GitHub cron)
 ```bash
 uv venv --python 3.12
@@ -67,8 +85,10 @@ checks only the first showtime, so your phone should buzz — proving the ntfy
 path. It never saves state and doesn't affect normal runs.
 
 ## Notes
-- **Rate/blocking:** ~13 pages every ~60 s with jitter is well under 1 req/s —
-  looks human. Don't drop `poll_seconds` much or you risk a 429.
+- **Rate/blocking:** each pass fetches all showtimes with a small thread pool
+  (`max_workers`, default 6) — fast (~9 s for 27 pages) without a bursty
+  27-at-once scrape. Keep `max_workers` modest and don't drop `poll_seconds`
+  much, or you risk AMC's WAF / a 429.
 - **State:** `state.json` remembers alerted pairs so you're not re-pinged, and
   re-notifies if a pair closes then reopens. It's committed back each run.
 - **GitHub cron caveat:** scheduled runs are best-effort — can be delayed or
