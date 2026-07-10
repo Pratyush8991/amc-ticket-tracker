@@ -135,15 +135,21 @@ def fetch_pairs(showtime_id, cfg, session):
 
 
 def notify(topic, title, message, click_url):
+    # HTTP header values must be latin-1; strip anything that isn't (e.g. emoji).
+    # Emoji still show via the ASCII `Tags` field. The message BODY is UTF-8, so
+    # rich text/emoji belong there, not in headers.
+    def h(v):
+        return v.encode("latin-1", "ignore").decode("latin-1")
+
     requests.post(
         f"https://ntfy.sh/{topic}",
         data=message.encode("utf-8"),
         headers={
-            "Title": title,
+            "Title": h(title),
             "Priority": "high",
             "Tags": "clapper,fire",
-            "Click": click_url,
-            "Actions": f"view, Book now, {click_url}",
+            "Click": h(click_url),
+            "Actions": h(f"view, Book now, {click_url}"),
         },
         timeout=15,
     )
@@ -172,8 +178,8 @@ def check_all(cfg, state, session, save=True):
             print(f"[HIT] {label}: {pair_id}")
             notify(
                 topic,
-                title=f"🎬 2 seats: {label}",
-                message=f"Seats {pair_id} open for Odyssey 70mm.\nTap to book now.",
+                title=f"2 seats: {label}",
+                message=f"🎬 Seats {pair_id} open for Odyssey 70mm.\nTap to book now.",
                 click_url=url,
             )
         if seen != current:
