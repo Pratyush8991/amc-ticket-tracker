@@ -127,6 +127,134 @@
     {
       "id": "143822445",
       "label": "Sun Jul 26, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822441",
+      "label": "Mon Jul 27, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822442",
+      "label": "Mon Jul 27, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822437",
+      "label": "Tue Jul 28, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822438",
+      "label": "Tue Jul 28, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822431",
+      "label": "Wed Jul 29, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822432",
+      "label": "Wed Jul 29, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822435",
+      "label": "Thu Jul 30, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822436",
+      "label": "Thu Jul 30, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822427",
+      "label": "Fri Jul 31, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822428",
+      "label": "Fri Jul 31, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822419",
+      "label": "Sat Aug 01, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822420",
+      "label": "Sat Aug 01, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822423",
+      "label": "Sun Aug 02, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822424",
+      "label": "Sun Aug 02, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822415",
+      "label": "Mon Aug 03, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822416",
+      "label": "Mon Aug 03, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822411",
+      "label": "Tue Aug 04, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822412",
+      "label": "Tue Aug 04, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "144696952",
+      "label": "Wed Aug 05, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "144696953",
+      "label": "Wed Aug 05, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "144696956",
+      "label": "Thu Aug 06, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "144696957",
+      "label": "Thu Aug 06, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "144696960",
+      "label": "Fri Aug 07, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "144696961",
+      "label": "Fri Aug 07, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "144696962",
+      "label": "Sat Aug 08, 10:00 AM (IMAX 70mm)"
+    },
+    {
+      "id": "144696963",
+      "label": "Sat Aug 08, 2:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "144696964",
+      "label": "Sat Aug 08, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "144696965",
+      "label": "Sat Aug 08, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "144696966",
+      "label": "Sun Aug 09, 10:00 AM (IMAX 70mm)"
+    },
+    {
+      "id": "144696967",
+      "label": "Sun Aug 09, 2:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "144696968",
+      "label": "Sun Aug 09, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "144696969",
+      "label": "Sun Aug 09, 10:00 PM (IMAX 70mm)"
     }
   ]
 }
