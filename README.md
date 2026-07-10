@@ -70,6 +70,44 @@ It runs `amc_watch.py --forever` (infinite loop, ignores `run_duration_seconds`)
 relaunches at login and on crash, and pauses while the Mac sleeps. Restart after
 edits: `launchctl kickstart -k gui/$(id -u)/com.prats.amc-ticket-tracker`.
 
+### Check it's running (and on cadence)
+
+```bash
+# 1. Alive? A numeric PID in the first column means it's running.
+launchctl list | grep amc-ticket-tracker
+
+# 2. Detailed state: running/not, pid, restart count, last exit code.
+launchctl print gui/$(id -u)/com.prats.amc-ticket-tracker | grep -E 'state|pid|runs|last exit'
+
+# 3. Watch it work LIVE — best way to confirm the ~60s cadence.
+#    A timestamped "pass complete" line prints every ~60-70s (60s poll + ~9s fetch).
+tail -f ~/Library/Logs/amc-ticket-tracker.log
+```
+
+In the live log, consecutive `pass complete` timestamps ~60–70s apart = healthy.
+A `[HIT] ...` line appears when a matching pair is found (and fires the push);
+`[warn] ...` flags a transient fetch error for one showtime (harmless, retried
+next pass). `Ctrl-C` just stops `tail`, not the daemon.
+
+### Uninstall — remove all traces
+
+```bash
+# 1. Stop and unload it (KeepAlive will NOT respawn once booted out).
+launchctl bootout gui/$(id -u)/com.prats.amc-ticket-tracker
+
+# 2. Delete the LaunchAgent and its log.
+rm -f ~/Library/LaunchAgents/com.prats.amc-ticket-tracker.plist
+rm -f ~/Library/Logs/amc-ticket-tracker.log
+
+# 3. Verify it's gone — no output means fully removed.
+launchctl list | grep amc-ticket-tracker
+```
+
+That removes the Mac runner completely. The GitHub Actions watcher, this repo,
+and the `NTFY_TOPIC` secret are separate — delete those independently if you want
+(disable the Action in the repo's Actions tab; the local `.venv/` can just be
+`rm -rf`'d).
+
 ## Local run / VPS (more reliable than GitHub cron)
 ```bash
 uv venv --python 3.12
