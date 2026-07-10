@@ -1,0 +1,131 @@
+{
+  "_comment": "AMC Metreon 16 - The Odyssey IMAX 70mm. No API key/cookies needed. Add more showtimes (Jul 27-Aug 1) as {id,label}. ntfy topic comes from the NTFY_TOPIC secret/env; the value below is only a local fallback.",
+  "ntfy_topic": "amc-odyssey-CHANGE-ME",
+  "poll_seconds": 60,
+  "run_duration_seconds": 270,
+  "_rows_note": "AMC skips row I; H-N = H,J,K,L,M,N. Only CanReserve seats count, so Wheelchair/Companion seats never trigger.",
+  "target_rows": [
+    "H",
+    "I",
+    "J",
+    "K",
+    "L",
+    "M",
+    "N"
+  ],
+  "num_min": 7,
+  "num_max": 21,
+  "bookable_types": [
+    "CanReserve"
+  ],
+  "showtimes": [
+    {
+      "id": "144251502",
+      "label": "Thu Jul 16, 10:45 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822410",
+      "label": "Fri Jul 17, 11:00 AM (IMAX 70mm)"
+    },
+    {
+      "id": "143822481",
+      "label": "Fri Jul 17, 3:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822482",
+      "label": "Fri Jul 17, 11:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822478",
+      "label": "Sat Jul 18, 11:00 AM (IMAX 70mm)"
+    },
+    {
+      "id": "143822479",
+      "label": "Sat Jul 18, 3:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822480",
+      "label": "Sat Jul 18, 11:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822472",
+      "label": "Sun Jul 19, 11:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822475",
+      "label": "Mon Jul 20, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822469",
+      "label": "Mon Jul 20, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822465",
+      "label": "Tue Jul 21, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822466",
+      "label": "Tue Jul 21, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822462",
+      "label": "Wed Jul 22, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822463",
+      "label": "Wed Jul 22, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822459",
+      "label": "Thu Jul 23, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822460",
+      "label": "Thu Jul 23, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822455",
+      "label": "Fri Jul 24, 2:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822456",
+      "label": "Fri Jul 24, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822457",
+      "label": "Fri Jul 24, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822452",
+      "label": "Sat Jul 25, 10:00 AM (IMAX 70mm)"
+    },
+    {
+      "id": "143822453",
+      "label": "Sat Jul 25, 2:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822454",
+      "label": "Sat Jul 25, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822448",
+      "label": "Sat Jul 25, 10:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822449",
+      "label": "Sun Jul 26, 10:00 AM (IMAX 70mm)"
+    },
+    {
+      "id": "143822450",
+      "label": "Sun Jul 26, 2:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822451",
+      "label": "Sun Jul 26, 6:00 PM (IMAX 70mm)"
+    },
+    {
+      "id": "143822445",
+      "label": "Sun Jul 26, 10:00 PM (IMAX 70mm)"
+    }
+  ]
+}

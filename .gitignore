@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+.claude/
+
+# config.json IS committed (the Actions runner needs it) — keep this repo PRIVATE.
+# The ntfy topic is injected from the NTFY_TOPIC secret, so it stays out of config.
