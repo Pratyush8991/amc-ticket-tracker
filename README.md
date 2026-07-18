@@ -1,141 +1,114 @@
 # amc-ticket-tracker
 
-Watches AMC Metreon 16 (San Francisco) seat maps for **The Odyssey — IMAX 70mm**
-and pushes an [ntfy.sh](https://ntfy.sh) notification the moment **two adjacent
-free seats** appear in the center block (rows H–N, seats 7–21), across every
-showtime you list (e.g. Jul 19 – Aug 1). You book manually via the link.
+Watches AMC seat maps for a specific movie/format and pings your phone the moment
+**two adjacent seats** open up in a block you care about. Built to grab a rescheduled
+**IMAX 70mm** ticket to *The Odyssey* at AMC Metreon 16 (San Francisco) when every
+showtime was sold out — it worked, catching center-block pairs on two different dates.
 
-**No API key, no cookies, no login required.** The seat page
-`https://www.amctheatres.com/showtimes/<ID>/seats` is server-rendered and embeds
-the full seat layout in its HTML; the script just fetches it and parses it.
-(Verified live: it correctly found an open `N7–N8` pair on a real showtime.)
+You get the notification; you book manually in the app. No login, no API key, no database.
 
-Why hybrid (auto-find, manual-buy): AMC checkout needs your login + Stubs/A-List
-benefit + CAPTCHA, and their telemetry flags automation (`webdriverDetected`).
-So we *notify fast* and you buy in the app. Do **not** point Selenium/Playwright
-at it — a plain HTTP GET is both simpler and less likely to be blocked.
+## How it works
 
-## Setup
+The interesting part is that there's almost nothing to it. AMC's seat page
 
-### 1. Collect showtime IDs (the only manual step — ~5 min, one time)
-For each IMAX 70mm showtime in your date range:
-1. On amctheatres.com, open the movie at AMC Metreon 16, click the 70mm showtime
-   through to the **seat map**.
-2. The address bar reads `.../showtimes/144251502/seats` — the number is the ID.
-3. Collect all of them (dates Jul 19 – Aug 1).
-
-> Auto-discovery isn't possible without AMC's vendor key: the *listing* pages
-> load showtimes client-side. The *seat* pages (what we poll) do not — hence no
-> key needed for the actual watching.
-
-### 2. Fill in config
-```bash
-cp config.example.json config.json
 ```
-Add one `{ "id", "label" }` per showtime. Rows/seat-number block is already set
-to H–N / 7–21 (note: AMC skips row **I**, so that's really H,J,K,L,M,N).
-Only `CanReserve` seats count, so **Wheelchair and Companion seats never trigger
-an alert** even though AMC marks them "available".
-
-A populated `config.json` ships with all Odyssey 70mm showtimes Jul 16 – Jul 26;
-add the Jul 27 – Aug 1 shows the same way as they open.
-
-### 3. Notifications (ntfy — no account, no key)
-1. Install the **ntfy** app, subscribe to a random topic name, e.g. `amc-odyssey-7fq3z`.
-2. GitHub → **Settings → Secrets and variables → Actions → New secret**:
-   name `NTFY_TOPIC`, value = that topic. (For local runs, pass it as an env var.)
-
-### 4. Turn on the cron
-- Push this repo to GitHub as a **PRIVATE** repo.
-- `.github/workflows/watch.yml` triggers every 5 min and internally polls
-  ~every 60 s for ~4.5 min, giving near-continuous coverage.
-- Kick off a first run: **Actions → AMC seat watch → Run workflow**.
-- Watch it work with the bundled TEST showtime first, then remove that entry.
-
-## Run on an always-on Mac (launchd) — recommended over GitHub cron
-
-GitHub's `schedule` cron is best-effort and can lag 15–40 min or drop runs (no
-plan/runner upgrade fixes this — it's a shared global queue). For catching seats
-that free up and vanish within minutes, run it locally with a true ~60s loop:
-
-1. `which uv` to get the uv path.
-2. Copy `mac/com.prats.amc-ticket-tracker.plist` to
-   `~/Library/LaunchAgents/`, and fill in `__UV_PATH__`, `__REPO_DIR__`,
-   `__HOME__`, `__NTFY_TOPIC__`.
-3. `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.prats.amc-ticket-tracker.plist`
-4. Verify: `launchctl list | grep amc-ticket-tracker` (a PID = running);
-   tail `~/Library/Logs/amc-ticket-tracker.log`.
-
-It runs `amc_watch.py --forever` (infinite loop, ignores `run_duration_seconds`),
-relaunches at login and on crash, and pauses while the Mac sleeps. Restart after
-edits: `launchctl kickstart -k gui/$(id -u)/com.prats.amc-ticket-tracker`.
-
-### Check it's running (and on cadence)
-
-```bash
-# 1. Alive? A numeric PID in the first column means it's running.
-launchctl list | grep amc-ticket-tracker
-
-# 2. Detailed state: running/not, pid, restart count, last exit code.
-launchctl print gui/$(id -u)/com.prats.amc-ticket-tracker | grep -E 'state|pid|runs|last exit'
-
-# 3. Watch it work LIVE — best way to confirm the ~60s cadence.
-#    A timestamped "pass complete" line prints every ~60-70s (60s poll + ~9s fetch).
-tail -f ~/Library/Logs/amc-ticket-tracker.log
+https://www.amctheatres.com/showtimes/<showtime_id>/seats
 ```
 
-In the live log, consecutive `pass complete` timestamps ~60–70s apart = healthy.
-A `[HIT] ...` line appears when a matching pair is found (and fires the push);
-`[warn] ...` flags a transient fetch error for one showtime (harmless, retried
-next pass). `Ctrl-C` just stops `tail`, not the daemon.
+is **server-rendered** — the entire seat layout is embedded in the page HTML (a
+`seatingLayout` object in the Next.js RSC payload). So a plain `requests.get()` with a
+normal browser User-Agent returns every seat's state. No headless browser, no vendor key.
 
-### Uninstall — remove all traces
+From there, the `amc_watch/` package splits into small, single-purpose modules
+(`seats.py` for the fetch/parse/adjacency pipeline, `notify.py` for the push,
+`config.py` for loading config/state, `__main__.py` for the poll loop):
 
-```bash
-# 1. Stop and unload it (KeepAlive will NOT respawn once booted out).
-launchctl bootout gui/$(id -u)/com.prats.amc-ticket-tracker
+- **Parse** the `seatingLayout` object out of the HTML.
+- **Find adjacent pairs**: two seats are physically adjacent when they share a grid row
+  and sit in consecutive grid columns. Aisles and wheelchair/companion seats occupy their
+  own columns, so they break adjacency for free — no special-casing needed.
+- **Filter** to your target rows/seat numbers and to real bookable (`CanReserve`) seats.
+- **Notify** via [ntfy.sh](https://ntfy.sh) with a one-tap "Book now" link to the seat page.
 
-# 2. Delete the LaunchAgent and its log.
-rm -f ~/Library/LaunchAgents/com.prats.amc-ticket-tracker.plist
-rm -f ~/Library/Logs/amc-ticket-tracker.log
+Fetches all showtimes concurrently with a small thread pool (default 6 workers, ~9s a
+pass) and polls every ~60s with a little jitter — fast enough to catch seats that free up
+for a minute, gentle enough to stay under AMC's bot detection.
 
-# 3. Verify it's gone — no output means fully removed.
-launchctl list | grep amc-ticket-tracker
-```
+## Why you still book manually
 
-That removes the Mac runner completely. The GitHub Actions watcher, this repo,
-and the `NTFY_TOPIC` secret are separate — delete those independently if you want
-(disable the Action in the repo's Actions tab; the local `.venv/` can just be
-`rm -rf`'d).
+Checkout needs a login, a CAPTCHA, and your AMC Stubs / A-List benefits, and AMC actively
+flags automation. So the tool does the boring part (watching) and you do the sensitive part
+(buying). That split is deliberate — don't point Selenium/Playwright at the checkout.
 
-## Local run / VPS (more reliable than GitHub cron)
+## Quick start
+
 ```bash
 uv venv --python 3.12
-uv pip install -r requirements.txt
-NTFY_TOPIC=your-topic uv run python amc_watch.py
+uv pip install -r requirements.txt      # only dependency: requests
+
+cp config.example.json config.json      # then fill in your showtimes (see below)
+NTFY_TOPIC=your-topic-name uv run python -m amc_watch
 ```
-For a true 24/7 60-second loop, set `"run_duration_seconds": 999999999` in
-config.json and run it under `launchd`/`systemd`/`pm2`.
 
-**Smoke-test notifications** (no open seats needed): `uv run python amc_watch.py
---test` temporarily counts Wheelchair/Companion seats (usually available) and
-checks only the first showtime, so your phone should buzz — proving the ntfy
-path. It never saves state and doesn't affect normal runs.
+Install the **ntfy** app on your phone and subscribe to `your-topic-name` (any random
+string) to receive the pushes. Smoke-test the notification path without waiting for open
+seats:
 
-## Notes
-- **Rate/blocking:** each pass fetches all showtimes with a small thread pool
-  (`max_workers`, default 6) — fast (~9 s for 27 pages) without a bursty
-  27-at-once scrape. Keep `max_workers` modest and don't drop `poll_seconds`
-  much, or you risk AMC's WAF / a 429.
-- **State:** `state.json` remembers alerted pairs so you're not re-pinged, and
-  re-notifies if a pair closes then reopens. It's committed back each run.
-- **GitHub cron caveat:** scheduled runs are best-effort — can be delayed or
-  skipped under load. A VPS/Pi loop avoids that entirely (same code).
-- **If it ever stops finding seats / errors with "seatingLayout not found":**
-  AMC changed the page shape. The parser lives in `extract_layout()` /
-  `parse_seats()` in `amc_watch.py`.
+```bash
+uv run python -m amc_watch --test
+```
 
-## Reference IDs
-- Movie: The Odyssey → `movie_id 76238`
-- Theatre: AMC Metreon 16, SF → `theatre_id 2325`
+## Configuration
+
+`config.json` is a flat list of showtimes plus the seat block to watch. The only manual
+step is collecting showtime IDs: open a showtime through to its seat map on
+amctheatres.com and copy the number from `.../showtimes/<ID>/seats`.
+
+```json
+{
+  "poll_seconds": 60,
+  "max_workers": 6,
+  "target_rows": ["H", "I", "J", "K", "L", "M", "N"],
+  "num_min": 7,
+  "num_max": 21,
+  "bookable_types": ["CanReserve"],
+  "showtimes": [
+    { "id": "143822475", "label": "Mon Jul 20, 6:00 PM (IMAX 70mm)" }
+  ]
+}
+```
+
+Note: AMC skips row **I**, so H–N is really H, J, K, L, M, N (listing "I" is harmless).
+The `ntfy_topic` can live here as a local fallback, but prefer the `NTFY_TOPIC` env var.
+
+## Running it continuously
+
+Two options, same code:
+
+- **Always-on machine (recommended).** `python -m amc_watch --forever` runs a true ~60s loop.
+  On a Mac, `mac/com.prats.amc-ticket-tracker.plist` is a `launchd` template that keeps it
+  alive across logins/crashes — see the comments in that file for install/uninstall.
+- **GitHub Actions.** `.github/workflows/watch.yml` runs on a `*/5` cron with an internal
+  poll loop to bridge the gap. Zero infra, but GitHub's scheduled cron is best-effort and
+  can lag or drop runs — fine for casual use, worse for seats that vanish in a minute.
+
+## Honest notes
+
+- **No database.** "State" is a single local, git-ignored `state.json` file that remembers
+  which pairs it already alerted, so you're not re-pinged every minute for the same open
+  seats — and are re-pinged if a pair closes then reopens. That's the entire persistence
+  layer. On an always-on runner it persists across restarts; in GitHub Actions it's per-run
+  (the internal poll loop still dedups within a single run).
+- **It's a scraper, so it's brittle.** If AMC changes the page shape you'll see
+  `seatingLayout not found`; the fix lives in `amc_watch/seats.py`.
+- **Be a good citizen.** This is a single-user personal tool with modest polling. Keep
+  `max_workers` small and `poll_seconds` sane so you don't hammer the site or trip a 429,
+  and complete the actual purchase yourself. Not affiliated with or endorsed by AMC; check
+  their terms before you run it.
+
+## Reference
+
 - Seat page pattern: `https://www.amctheatres.com/showtimes/<showtime_id>/seats`
+- Example target: The Odyssey (IMAX 70mm) @ AMC Metreon 16, SF
+
+Built with [Claude Code](https://claude.com/claude-code). See `LINKEDIN_POST.md` for the story.

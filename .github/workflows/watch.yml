@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: false   # let an in-flight run finish rather than overlap
 
 permissions:
-  contents: write   # to commit state.json back to the repo
+  contents: read   # read-only; state is not persisted back to the repo
 
 jobs:
   watch:
@@ -29,19 +29,11 @@ jobs:
           uv venv --python 3.12
           uv pip install -r requirements.txt
 
+      # Dedup state (state.json) is per-run in CI: the internal poll loop avoids repeat
+      # alerts within a run, but a seat still open on the next trigger may re-alert. For
+      # cross-run dedup and a true ~60s loop, run under launchd/systemd on an always-on
+      # box (see README) instead.
       - name: Poll seat maps
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-        run: uv run python amc_watch.py
-
-      - name: Persist notified state
-        run: |
-          if ! git diff --quiet -- state.json; then
-            git config user.name  "amc-watch-bot"
-            git config user.email "amc-watch-bot@users.noreply.github.com"
-            git add state.json
-            git commit -m "state: update notified seats [skip ci]"
-            git push
-          else
-            echo "No state change."
-          fi
+        run: uv run python -m amc_watch

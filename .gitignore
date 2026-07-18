@@ -3,5 +3,12 @@ __pycache__/
 .venv/
 .claude/
 
-# config.json IS committed (the Actions runner needs it) — keep this repo PRIVATE.
-# The ntfy topic is injected from the NTFY_TOPIC secret, so it stays out of config.
+# Runtime dedup cache the watcher writes as it runs — local only, not part of the repo.
+state.json
+
+# Personal LinkedIn draft — not part of the project.
+LINKEDIN_POST.md
+
+# config.json is committed as a working example (the Actions runner reads it, and it
+# holds no secrets — just public showtime IDs). Your ntfy topic comes from the
+# NTFY_TOPIC secret/env, so it never needs to live in the file.

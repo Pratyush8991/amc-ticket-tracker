@@ -24,7 +24,8 @@
         <string>__UV_PATH__</string>
         <string>run</string>
         <string>python</string>
-        <string>amc_watch.py</string>
+        <string>-m</string>
+        <string>amc_watch</string>
         <string>--forever</string>
     </array>
 
