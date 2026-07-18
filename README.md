@@ -9,7 +9,7 @@ You get the notification; you book manually in the app. No login, no API key, no
 
 ## How it works
 
-The interesting part is that there's almost nothing to it. AMC's seat page
+AMC's seat page
 
 ```
 https://www.amctheatres.com/showtimes/<showtime_id>/seats
@@ -27,7 +27,9 @@ From there, the `amc_watch/` package splits into small, single-purpose modules
 - **Find adjacent pairs**: two seats are physically adjacent when they share a grid row
   and sit in consecutive grid columns. Aisles and wheelchair/companion seats occupy their
   own columns, so they break adjacency for free — no special-casing needed.
-- **Filter** to your target rows/seat numbers and to real bookable (`CanReserve`) seats.
+- **Filter** to your target rows/seat numbers and to standard `CanReserve` seats — AMC
+  marks wheelchair and companion seats `available` too, so filtering by seat *type* is what
+  keeps them from firing false alerts.
 - **Notify** via [ntfy.sh](https://ntfy.sh) with a one-tap "Book now" link to the seat page.
 
 Fetches all showtimes concurrently with a small thread pool (default 6 workers, ~9s a
@@ -110,5 +112,3 @@ Two options, same code:
 
 - Seat page pattern: `https://www.amctheatres.com/showtimes/<showtime_id>/seats`
 - Example target: The Odyssey (IMAX 70mm) @ AMC Metreon 16, SF
-
-Built with [Claude Code](https://claude.com/claude-code). See `LINKEDIN_POST.md` for the story.
