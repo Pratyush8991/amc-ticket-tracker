@@ -1,11 +1,17 @@
 # amc-ticket-tracker
 
-Watches AMC seat maps for a specific movie/format and pings your phone the moment
-**two adjacent seats** open up in a block you care about. Built to grab a rescheduled
-**IMAX 70mm** ticket to *The Odyssey* at AMC Metreon 16 (San Francisco) when every
-showtime was sold out — it worked, catching center-block pairs on two different dates.
+Watches AMC seat maps and pings your phone the moment enough **adjacent, actually
+bookable** seats open up in a block you care about. You get the notification; you book
+manually in the app.
 
-You get the notification; you book manually in the app. No login, no API key, no database.
+It began as a single-user script built to grab a rescheduled **IMAX 70mm** ticket to
+*The Odyssey* at AMC Metreon 16 — which worked, catching center-block pairs on two
+different dates. It is now being rebuilt as a small invite-only hosted service so several
+people can watch different movies, formats and seat blocks at once. That rebuild is in
+progress; see **Status** below for what actually runs today.
+
+- The vocabulary is in [`CONTEXT.md`](CONTEXT.md).
+- The four load-bearing decisions are in [`docs/adr/`](docs/adr/).
 
 ## How it works
 
@@ -15,100 +21,102 @@ AMC's seat page
 https://www.amctheatres.com/showtimes/<showtime_id>/seats
 ```
 
-is **server-rendered** — the entire seat layout is embedded in the page HTML (a
-`seatingLayout` object in the Next.js RSC payload). So a plain `requests.get()` with a
-normal browser User-Agent returns every seat's state. No headless browser, no vendor key.
+is **server-rendered**: the entire seat layout is embedded in the page (a `seatingLayout`
+object in the Next.js RSC payload), along with the movie, theatre, format and start time.
+So a plain `requests.get()` with a browser User-Agent returns everything — and a *bare
+showtime ID is enough*, because the page describes itself. No vendor key, no headless
+browser.
 
-From there, the `amc_watch/` package splits into small, single-purpose modules
-(`seats.py` for the fetch/parse/adjacency pipeline, `notify.py` for the push,
-`config.py` for loading config/state, `__main__.py` for the poll loop):
+That matters more than it sounds, because AMC's listing and theatre pages now redirect
+into a Queue-it waiting room. Seat pages are the only door left, so showtime IDs enter the
+system by human contribution rather than by crawling (ADR-0001).
 
-- **Parse** the `seatingLayout` object out of the HTML.
-- **Find adjacent pairs**: two seats are physically adjacent when they share a grid row
-  and sit in consecutive grid columns. Aisles and wheelchair/companion seats occupy their
-  own columns, so they break adjacency for free — no special-casing needed.
-- **Filter** to your target rows/seat numbers and to standard `CanReserve` seats — AMC
-  marks wheelchair and companion seats `available` too, so filtering by seat *type* is what
-  keeps them from firing false alerts.
-- **Notify** via [ntfy.sh](https://ntfy.sh) with a one-tap "Book now" link to the seat page.
+Three things fall out of the layout grid:
 
-Fetches all showtimes concurrently with a small thread pool (default 6 workers, ~9s a
-pass) and polls every ~60s with a little jitter — fast enough to catch seats that free up
-for a minute, gentle enough to stay under AMC's bot detection.
+- **Adjacency** is consecutive grid *columns* in the same grid row. Aisles and
+  wheelchair/companion seats occupy their own columns, so they break adjacency for free.
+- **Printed seat names are a different coordinate system.** In the Metreon IMAX house, K34
+  sits at grid column 1 and K1 at column 34 — numbers descend as columns ascend. Adjacency
+  is only ever computed on grid coordinates.
+- **Available is not bookable.** AMC marks wheelchair and companion seats available too,
+  so filtering by seat *type* (`CanReserve`) is what keeps them from firing false alerts.
 
-## Why you still book manually
+## Status
 
-Checkout needs a login, a CAPTCHA, and your AMC Stubs / A-List benefits, and AMC actively
-flags automation. So the tool does the boring part (watching) and you do the sensitive part
-(buying). That split is deliberate — don't point Selenium/Playwright at the checkout.
+The rebuild is landing in slices, tracked in GitHub issues. What exists today:
+
+| Area | State |
+| --- | --- |
+| `fetch_core` — Seat Page GET + RSC parse, error taxonomy | working |
+| `amc-watch smoke-test` — the first act on any new box | working |
+| Test harness — ephemeral Postgres, Alembic baseline, recorded fixtures | working |
+| `registry` — contribution + enrichment | skeleton (#3) |
+| `watching` — selectors, lifecycle, Opening computation | skeleton (#4, #6) |
+| `alerting` — ntfy Channel, dedup ledger | skeleton (#4) |
+| `web` — invites, watch management, seat picker, bookmarklet | skeleton (#8–#12) |
+
+The single-user script this grew out of — flat `config.json`, `state.json`, the Actions
+cron and the launchd plist — has been retired. It is preserved in git history (before
+commit `4384f47`), including the 59 Odyssey showtime IDs it watched.
 
 ## Quick start
 
 ```bash
-uv venv --python 3.12
-uv pip install -r requirements.txt      # only dependency: requests
-
-cp config.example.json config.json      # then fill in your showtimes (see below)
-NTFY_TOPIC=your-topic-name uv run python -m amc_watch
+uv sync --extra dev
 ```
 
-Install the **ntfy** app on your phone and subscribe to `your-topic-name` (any random
-string) to receive the pushes. Smoke-test the notification path without waiting for open
-seats:
+Before anything else on a new machine, check that it can reach AMC at all:
 
 ```bash
-uv run python -m amc_watch --test
+uv run amc-watch smoke-test
 ```
 
-## Configuration
-
-`config.json` is a flat list of showtimes plus the seat block to watch. The only manual
-step is collecting showtime IDs: open a showtime through to its seat map on
-amctheatres.com and copy the number from `.../showtimes/<ID>/seats`.
-
-```json
-{
-  "poll_seconds": 60,
-  "max_workers": 6,
-  "target_rows": ["H", "I", "J", "K", "L", "M", "N"],
-  "num_min": 7,
-  "num_max": 21,
-  "bookable_types": ["CanReserve"],
-  "showtimes": [
-    { "id": "143822475", "label": "Mon Jul 20, 6:00 PM (IMAX 70mm)" }
-  ]
-}
+```
+GET https://www.amctheatres.com/showtimes/144696969/seats
+PASS: The Odyssey - IMAX 70MM (imax70mm) at AMC Metreon 16, 2026-08-09 17:00 UTC
+      437 seats in the layout, 1 bookable right now
 ```
 
-Note: AMC skips row **I**, so H–N is really H, J, K, L, M, N (listing "I" is harmless).
-The `ntfy_topic` can live here as a local fallback, but prefer the `NTFY_TOPIC` env var.
+A `FAIL` tells you which wall you hit and what to do about it — a queue redirect, a 403,
+a 429, a dead showtime ID, or a changed page shape are all reported distinctly, because
+"AMC blocked us" and "no seats are open" must never look alike. Showtimes pass, so the
+default ID rots; override it with `--showtime-id <id>`.
 
-## Running it continuously
+## Tests
 
-Two options, same code:
+```bash
+uv run --extra dev pytest          # unit + integration; never touches AMC
+uv run --extra dev pytest -m live  # the one test that really hits AMC
+```
 
-- **Always-on machine (recommended).** `python -m amc_watch --forever` runs a true ~60s loop.
-  On a Mac, `mac/com.prats.amc-ticket-tracker.plist` is a `launchd` template that keeps it
-  alive across logins/crashes — see the comments in that file for install/uninstall.
-- **GitHub Actions.** `.github/workflows/watch.yml` runs on a `*/5` cron with an internal
-  poll loop to bridge the gap. Zero infra, but GitHub's scheduled cron is best-effort and
-  can lag or drop runs — fine for casual use, worse for seats that vanish in a minute.
+The suite fakes exactly one thing: the outbound HTTP edge. AMC is served from Seat Page
+payloads recorded off the real site, so unescaping, parsing and the error taxonomy all run
+for real — a parser regression fails the build. The fixtures are genuinely missing row I
+and genuinely have wheelchair seats open while standard seats are sold, so the two nastiest
+cases are recorded rather than imagined. Re-record with
+`python tools/record_seat_page_fixture.py --showtime-id <id>`.
+
+Postgres is real, not faked: the suite boots a throwaway container locally, or uses
+`DATABASE_URL` if you set one (which is what CI does).
+
+## Why you still book manually
+
+Checkout needs a login, a CAPTCHA and your AMC Stubs / A-List benefits, and AMC actively
+flags automation. The tool does the boring part (watching) and you do the sensitive part
+(buying). That split is permanent, not a TODO — don't point Selenium or Playwright at
+checkout.
 
 ## Honest notes
 
-- **No database.** "State" is a single local, git-ignored `state.json` file that remembers
-  which pairs it already alerted, so you're not re-pinged every minute for the same open
-  seats — and are re-pinged if a pair closes then reopens. That's the entire persistence
-  layer. On an always-on runner it persists across restarts; in GitHub Actions it's per-run
-  (the internal poll loop still dedups within a single run).
-- **It's a scraper, so it's brittle.** If AMC changes the page shape you'll see
-  `seatingLayout not found`; the fix lives in `amc_watch/seats.py`.
-- **Be a good citizen.** This is a single-user personal tool with modest polling. Keep
-  `max_workers` small and `poll_seconds` sane so you don't hammer the site or trip a 429,
-  and complete the actual purchase yourself. Not affiliated with or endorsed by AMC; check
-  their terms before you run it.
-
-## Reference
-
-- Seat page pattern: `https://www.amctheatres.com/showtimes/<showtime_id>/seats`
-- Example target: The Odyssey (IMAX 70mm) @ AMC Metreon 16, SF
+- **It's a scraper, so it's brittle.** If AMC changes the page shape you get a loud
+  `SeatPageShapeChanged`, never a quiet "no seats". The fix lives in
+  `src/amc_watch/fetch_core/parse.py`.
+- **The transport is load-bearing.** python-requests with browser headers passes AMC's
+  Cloudflare hardening where curl gets a 403. Don't casually port it (ADR-0003).
+- **AMC's tolerance is the bottleneck, not compute.** Polling is budgeted globally on
+  purpose. A handful of hand-run probes from one box was enough to draw a 429 on
+  2026-07-28, which is roughly how much headroom there is.
+- **Datacenter IPs are not proven.** Every successful fetch on record came from a
+  residential connection; from a datacenter IP the queue wall appears intermittently. Run
+  the smoke test on any new box before building on it (ADR-0004).
+- Not affiliated with or endorsed by AMC; check their terms before you run it.
