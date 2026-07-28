@@ -16,6 +16,7 @@ import requests
 from .errors import (
     AccessBlocked,
     QueueWalled,
+    RateLimited,
     SeatPageUnavailable,
     ShowtimeNotFound,
 )
@@ -46,16 +47,25 @@ def _classify(response, showtime_id):
     Ordering matters: the queue check comes first because Queue-it answers 200 once the
     redirect is followed, so status alone would read it as success.
     """
-    if QUEUE_HOST in (response.url or "") or any(
-        QUEUE_HOST in (r.headers.get("location") or "") for r in response.history
-    ):
+    sent_to = next(
+        (
+            loc
+            for r in response.history
+            if QUEUE_HOST in (loc := r.headers.get("location") or "")
+        ),
+        response.url if QUEUE_HOST in (response.url or "") else None,
+    )
+    if sent_to:
         raise QueueWalled(
-            f"redirected into the Queue-it waiting room ({response.url})", showtime_id
+            f"redirected into the Queue-it waiting room at {sent_to.split('?')[0]}",
+            showtime_id,
         )
     if response.status_code == 403:
         raise AccessBlocked("403 refused by AMC/Cloudflare", showtime_id)
     if response.status_code == 404:
         raise ShowtimeNotFound("404 — no such showtime", showtime_id)
+    if response.status_code == 429:
+        raise RateLimited("HTTP 429 — asking too often", showtime_id)
     if not response.ok:
         raise SeatPageUnavailable(f"HTTP {response.status_code}", showtime_id)
 

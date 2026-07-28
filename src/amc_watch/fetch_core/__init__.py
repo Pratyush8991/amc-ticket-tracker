@@ -4,6 +4,7 @@ from .client import DEFAULT_TIMEOUT, HEADERS, fetch_seat_page, seat_page_url
 from .errors import (
     AccessBlocked,
     QueueWalled,
+    RateLimited,
     SeatPageError,
     SeatPageShapeChanged,
     SeatPageUnavailable,
@@ -18,6 +19,7 @@ __all__ = [
     "HEADERS",
     "AccessBlocked",
     "QueueWalled",
+    "RateLimited",
     "Seat",
     "SeatPage",
     "SeatPageError",

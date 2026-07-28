@@ -36,6 +36,15 @@ class ShowtimeNotFound(SeatPageError):
     """404 — the showtime ID is dead or was never real (a Contribution typo)."""
 
 
+class RateLimited(SeatPageError):
+    """429 — we asked too often.
+
+    Unlike AccessBlocked this is self-inflicted and the remedy is ours: spend less
+    Polling Budget. Observed after only a handful of manual probes on 2026-07-28, which
+    is a useful calibration for how little headroom the fast lane really has.
+    """
+
+
 class SeatPageUnavailable(SeatPageError):
     """Transport failure or an unexpected HTTP status. Retryable."""
 
