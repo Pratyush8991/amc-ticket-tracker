@@ -1,0 +1,43 @@
+name: tests
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Postgres as a service container rather than testcontainers: CI already has a
+    # daemon, and DATABASE_URL is the same switch the ephemeral local container flips.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: amc
+          POSTGRES_PASSWORD: amc
+          POSTGRES_DB: amc_watch_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+psycopg://amc:amc@localhost:5432/amc_watch_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      # The suite never reaches amctheatres.com: AMC traffic is faked at the outbound
+      # HTTP edge with recorded payloads. The one test that does hit AMC is marked
+      # `live` and deselected by default — CI must never spend Polling Budget, and a
+      # GitHub runner's datacenter IP would be queue-walled anyway.
+      - name: Run tests
+        run: uv run --extra dev pytest -q
