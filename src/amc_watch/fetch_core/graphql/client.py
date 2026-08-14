@@ -10,6 +10,10 @@ This module is the seam the test suite fakes: tests inject a curl_cffi-shaped se
 serving recorded GraphQL JSON, so query building → classification → parse runs real.
 """
 
+import json
+from datetime import date
+from urllib.parse import quote, unquote
+
 from ..client import DEFAULT_TIMEOUT
 from .parse import parse_discovery, parse_seat_response
 from .queries import DISCOVERY_QUERY, seat_query
@@ -49,6 +53,29 @@ def _graphql(session, query, timeout, variables=None):
     return response.json()
 
 
+_EPOCH = date(1970, 1, 1)
+
+
+def _patch_business_date(session, business_date):
+    """Point the session cookie's business date at the target day.
+
+    AMC reads the listing date from the URL-encoded JSON `session` cookie
+    (`nowInDays` = days since the Unix epoch, plus `lastViewedDate`), so the patch
+    happens in the warmed jar before each discovery POST. Every other field the
+    warm-up earned is preserved — the cookie is also what authorizes the host.
+    """
+    raw = session.cookies.get("session")
+    try:
+        fields = json.loads(unquote(raw)) if raw else {}
+    except ValueError:
+        fields = {}
+    if not isinstance(fields, dict):
+        fields = {}
+    fields["nowInDays"] = (business_date - _EPOCH).days
+    fields["lastViewedDate"] = f"{business_date:%Y%m%d}T12:00:00.000Z"
+    session.cookies.set("session", quote(json.dumps(fields)), domain=".amctheatres.com")
+
+
 def discover_showtimes(theatre_slug, business_date, session=None, timeout=DEFAULT_TIMEOUT):
     """Enumerate one theatre's Showtimes for one business date — Discovery.
 
@@ -60,6 +87,7 @@ def discover_showtimes(theatre_slug, business_date, session=None, timeout=DEFAUL
     owned = session is None
     session = session or open_graphql_session()
     try:
+        _patch_business_date(session, business_date)
         payload = _graphql(
             session, DISCOVERY_QUERY, timeout, variables={"slug": theatre_slug}
         )

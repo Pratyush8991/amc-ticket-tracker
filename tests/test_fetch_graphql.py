@@ -7,7 +7,9 @@ RSC page (the RSC payload embeds the same GraphQL showtime object the server que
 so the two backends are tested against the same recorded AMC data.
 """
 
+import json
 from datetime import date, datetime, timezone
+from urllib.parse import quote, unquote
 
 from amc_watch.fetch_core import discover_showtimes, fetch_seat_page, fetch_seat_page_graphql
 
@@ -71,6 +73,31 @@ def test_a_format_code_arrives_from_discovery_never_hardcoded():
 
     assert (doomsday.format_code, doomsday.format_name) == ("infinityvision", "InfinityVision")
     assert doomsday.status == "OnSale"
+
+
+def test_discovery_drives_the_business_date_through_the_session_cookie():
+    """The target date is cookie-driven, not a query argument (ADR-0005): AMC reads it
+    from the session cookie's nowInDays/lastViewedDate. 2026-08-15 is day 20,680 of
+    the Unix epoch — worked out by hand, not with the code under test."""
+    session = graphql_serving("metreon_discovery")
+    discover_showtimes(METREON, business_date=SATURDAY, session=session)
+
+    patched = json.loads(unquote(session.cookies.get("session")))
+    assert patched["nowInDays"] == 20680
+    assert patched["lastViewedDate"] == "20260815T12:00:00.000Z"
+    [set_call] = session.cookies.set_calls
+    assert set_call["domain"] == ".amctheatres.com"
+
+
+def test_the_session_cookies_other_fields_survive_the_date_patch():
+    """The warmed cookie is what authorizes the host — the patch must not lobotomize it."""
+    warmed = quote(json.dumps({"nowInDays": 20000, "deviceId": "abc-123"}))
+    session = graphql_serving("metreon_discovery", cookies={"session": warmed})
+    discover_showtimes(METREON, business_date=SATURDAY, session=session)
+
+    patched = json.loads(unquote(session.cookies.get("session")))
+    assert patched["deviceId"] == "abc-123"
+    assert patched["nowInDays"] == 20680
 
 
 def test_a_theatre_with_no_showtimes_is_an_answer_not_a_failure():
