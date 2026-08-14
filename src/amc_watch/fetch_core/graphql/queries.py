@@ -7,6 +7,43 @@ extraction. The showtime id is inlined as an int literal (the confirmed form) ra
 than a typed variable, because the argument's schema type name is unverified.
 """
 
+DISCOVERY_QUERY = """
+query TheatreShowtimes($slug: String!) {
+  viewer {
+    theatre(slug: $slug) {
+      theatreId
+      name
+      slug
+      formats {
+        items {
+          attributes { name code }
+          groups(first: 100) {
+            edges {
+              node {
+                showtimes(first: 200) {
+                  edges {
+                    node {
+                      showtimeId
+                      showDateTimeUtc
+                      status
+                      auditorium
+                      isReservedSeating
+                      format { edges { node { code name } } }
+                      movie { name slug movieId }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
+
 _SEAT_QUERY = """
 {
   viewer {

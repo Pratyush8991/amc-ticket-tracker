@@ -7,8 +7,8 @@ SeatPage metadata extraction are literally shared with the RSC side (`parse_seat
 """
 
 from ..errors import ShapeChanged
-from ..model import SeatPage
-from ..parse import parse_seats, showtime_fields
+from ..model import DiscoveredShowtime, SeatPage
+from ..parse import _first_edge_node, parse_seats, parse_starts_at, showtime_fields
 
 
 def _viewer(payload, what):
@@ -17,6 +17,63 @@ def _viewer(payload, what):
     if not isinstance(viewer, dict):
         raise ShapeChanged(f"{what}: GraphQL response has no viewer")
     return viewer
+
+
+def parse_discovery(payload, theatre_slug):
+    """Reduce a discovery response to pre-enriched DiscoveredShowtime rows.
+
+    The same Showtime can appear under several format tabs (e.g. both "IMAX" and
+    "IMAX 70MM"), so rows are unioned across all tabs and groups and deduped by
+    showtime ID, first appearance winning. An empty result is an answer — a theatre
+    with nothing scheduled that day — never an exception.
+    """
+    theatre = _viewer(payload, "graphql discovery").get("theatre")
+    if not isinstance(theatre, dict):
+        raise ShapeChanged(f"graphql discovery: no theatre in response for {theatre_slug!r}")
+    if theatre.get("theatreId") is None:
+        raise ShapeChanged("graphql discovery: theatre has no theatreId")
+
+    rows, seen = [], set()
+    for item in (theatre.get("formats") or {}).get("items") or []:
+        for group_edge in (item.get("groups") or {}).get("edges") or []:
+            showtimes = ((group_edge.get("node") or {}).get("showtimes") or {}).get("edges") or []
+            for edge in showtimes:
+                row = _discovered_row(edge.get("node") or {}, theatre, theatre_slug)
+                if row.showtime_id not in seen:
+                    seen.add(row.showtime_id)
+                    rows.append(row)
+    return tuple(rows)
+
+
+def _discovered_row(node, theatre, theatre_slug):
+    fmt = _first_edge_node(node, "format")
+    movie = node.get("movie") or {}
+    missing = [
+        k
+        for k, v in {
+            "showtimeId": node.get("showtimeId"),
+            "movie.movieId": movie.get("movieId"),
+            "format.code": fmt.get("code"),
+        }.items()
+        if v is None
+    ]
+    if missing:
+        raise ShapeChanged(f"graphql discovery: showtime row missing {', '.join(missing)}")
+    return DiscoveredShowtime(
+        showtime_id=int(node["showtimeId"]),
+        theatre_id=int(theatre["theatreId"]),
+        theatre_slug=theatre.get("slug") or theatre_slug,
+        theatre_name=theatre.get("name") or "",
+        movie_id=int(movie["movieId"]),
+        movie_name=movie.get("name") or "",
+        movie_slug=movie.get("slug") or "",
+        format_code=fmt["code"],
+        format_name=fmt.get("name") or "",
+        starts_at_utc=parse_starts_at(node.get("showDateTimeUtc"), "graphql discovery"),
+        auditorium=str(node.get("auditorium") or ""),
+        status=str(node.get("status") or ""),
+        is_reserved_seating=bool(node.get("isReservedSeating")),
+    )
 
 
 def parse_seat_response(payload, showtime_id):

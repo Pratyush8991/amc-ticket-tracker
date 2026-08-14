@@ -116,6 +116,14 @@ def _first_edge_node(obj, key):
     return (edges[0].get("node") or {}) if edges else {}
 
 
+def parse_starts_at(raw, what):
+    """AMC's `showDateTimeUtc` ISO string → an aware datetime, or ShapeChanged."""
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except (AttributeError, ValueError) as e:
+        raise ShapeChanged(f"{what}: unreadable showDateTimeUtc {raw!r}") from e
+
+
 def parse_showtime(text):
     """Pull Showtime/Format/movie/theatre metadata out of an unescaped payload."""
     at = text.find(_SHOWTIME_KEY)
@@ -135,13 +143,7 @@ def showtime_fields(obj):
     fmt = _first_edge_node(obj, "format")
     movie = obj.get("movie") or {}
     theatre = obj.get("theatre") or {}
-    raw_start = obj.get("showDateTimeUtc")
-    try:
-        starts_at_utc = datetime.fromisoformat(raw_start.replace("Z", "+00:00"))
-    except (AttributeError, ValueError) as e:
-        raise ShapeChanged(
-            f"showtime metadata: unreadable showDateTimeUtc {raw_start!r}"
-        ) from e
+    starts_at_utc = parse_starts_at(obj.get("showDateTimeUtc"), "showtime metadata")
     missing = [
         k
         for k, v in {

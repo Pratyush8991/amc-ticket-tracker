@@ -11,8 +11,8 @@ serving recorded GraphQL JSON, so query building → classification → parse ru
 """
 
 from ..client import DEFAULT_TIMEOUT
-from .parse import parse_seat_response
-from .queries import seat_query
+from .parse import parse_discovery, parse_seat_response
+from .queries import DISCOVERY_QUERY, seat_query
 
 GRAPHQL_URL = "https://graph.amctheatres.com/"
 WARMUP_URL = "https://www.amctheatres.com/"
@@ -39,11 +39,34 @@ def open_graphql_session():
     return session
 
 
-def _graphql(session, query, timeout):
+def _graphql(session, query, timeout, variables=None):
     response = session.post(
-        GRAPHQL_URL, json={"query": query}, headers=GRAPHQL_HEADERS, timeout=timeout
+        GRAPHQL_URL,
+        json={"query": query, "variables": variables or {}},
+        headers=GRAPHQL_HEADERS,
+        timeout=timeout,
     )
     return response.json()
+
+
+def discover_showtimes(theatre_slug, business_date, session=None, timeout=DEFAULT_TIMEOUT):
+    """Enumerate one theatre's Showtimes for one business date — Discovery.
+
+    The sole way Showtimes enter the Registry (ADR-0005). Rows come back
+    pre-enriched (movie, format, start time, auditorium, theatre), so no second
+    fetch follows. The business date is cookie-driven, not an argument of the query;
+    callers loop forward day by day and union the IDs.
+    """
+    owned = session is None
+    session = session or open_graphql_session()
+    try:
+        payload = _graphql(
+            session, DISCOVERY_QUERY, timeout, variables={"slug": theatre_slug}
+        )
+        return parse_discovery(payload, theatre_slug)
+    finally:
+        if owned:
+            session.close()
 
 
 def fetch_seat_page_graphql(showtime_id, session=None, timeout=DEFAULT_TIMEOUT):

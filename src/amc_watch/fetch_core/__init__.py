@@ -19,8 +19,8 @@ from .errors import (
     ShowtimeNotFound,
     TheatreNotFound,
 )
-from .graphql import fetch_seat_page_graphql, open_graphql_session
-from .model import BOOKABLE_TYPES, Seat, SeatPage
+from .graphql import discover_showtimes, fetch_seat_page_graphql, open_graphql_session
+from .model import BOOKABLE_TYPES, DiscoveredShowtime, Seat, SeatPage
 from .parse import parse_seat_page
 
 __all__ = [
@@ -33,10 +33,12 @@ __all__ = [
     "QueueWalled",
     "RateLimited",
     "Seat",
+    "DiscoveredShowtime",
     "SeatPage",
     "ShapeChanged",
     "ShowtimeNotFound",
     "TheatreNotFound",
+    "discover_showtimes",
     "fetch_seat_page",
     "fetch_seat_page_graphql",
     "open_graphql_session",
