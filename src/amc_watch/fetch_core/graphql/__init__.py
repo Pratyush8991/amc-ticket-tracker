@@ -5,6 +5,7 @@ from .client import (
     GRAPHQL_URL,
     WARMUP_URL,
     discover_showtimes,
+    enumerate_theatres,
     fetch_seat_page_graphql,
     open_graphql_session,
 )
@@ -14,6 +15,7 @@ __all__ = [
     "GRAPHQL_URL",
     "WARMUP_URL",
     "discover_showtimes",
+    "enumerate_theatres",
     "fetch_seat_page_graphql",
     "open_graphql_session",
 ]

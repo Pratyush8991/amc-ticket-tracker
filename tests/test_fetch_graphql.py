@@ -11,9 +11,14 @@ import json
 from datetime import date, datetime, timezone
 from urllib.parse import quote, unquote
 
-from amc_watch.fetch_core import discover_showtimes, fetch_seat_page, fetch_seat_page_graphql
+from amc_watch.fetch_core import (
+    discover_showtimes,
+    enumerate_theatres,
+    fetch_seat_page,
+    fetch_seat_page_graphql,
+)
 
-from .conftest import graphql_serving, serving
+from .conftest import graphql_paging, graphql_serving, serving
 
 METREON = "amc-metreon-16"
 SATURDAY = date(2026, 8, 15)
@@ -73,6 +78,26 @@ def test_a_format_code_arrives_from_discovery_never_hardcoded():
 
     assert (doomsday.format_code, doomsday.format_name) == ("infinityvision", "InfinityVision")
     assert doomsday.status == "OnSale"
+
+
+def test_theatre_enumeration_pages_through_the_whole_connection():
+    """query "AMC" matches every theatre; the client follows endCursor until
+    hasNextPage goes false, and a Theatre carries what Discovery targeting and the
+    theatre pickers need — above all the slug."""
+    session = graphql_paging({None: "theatres_page1", "cGM6MToxOjI=": "theatres_page2"})
+    theatres = enumerate_theatres(session=session)
+
+    assert [t.theatre_id for t in theatres] == [6, 24, 25]
+    esquire = theatres[0]
+    assert esquire.slug == "amc-esquire-7"
+    assert esquire.name == "AMC Esquire 7"
+    assert (esquire.city, esquire.state) == ("Saint Louis", "Missouri")
+    assert (esquire.latitude, esquire.longitude) == (38.6485, -90.305)
+    assert esquire.ticketable is True
+
+    assert len(session.posts) == 2
+    assert session.posts[0]["json"]["variables"]["after"] is None
+    assert session.posts[1]["json"]["variables"]["after"] == "cGM6MToxOjI="
 
 
 def test_discovery_drives_the_business_date_through_the_session_cookie():

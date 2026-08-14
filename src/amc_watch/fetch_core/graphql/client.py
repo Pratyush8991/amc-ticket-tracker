@@ -15,8 +15,9 @@ from datetime import date
 from urllib.parse import quote, unquote
 
 from ..client import DEFAULT_TIMEOUT
-from .parse import parse_discovery, parse_seat_response
-from .queries import DISCOVERY_QUERY, seat_query
+from ..errors import ShapeChanged
+from .parse import parse_discovery, parse_seat_response, parse_theatre_page
+from .queries import DISCOVERY_QUERY, THEATRES_QUERY, seat_query
 
 GRAPHQL_URL = "https://graph.amctheatres.com/"
 WARMUP_URL = "https://www.amctheatres.com/"
@@ -51,6 +52,52 @@ def _graphql(session, query, timeout, variables=None):
         timeout=timeout,
     )
     return response.json()
+
+
+def enumerate_theatres(
+    session=None,
+    *,
+    query="AMC",
+    coordinates=None,
+    include_attributes=None,
+    exclude_attributes=None,
+    brand=None,
+    operation=None,
+    page_size=50,
+    timeout=DEFAULT_TIMEOUT,
+):
+    """Enumerate or search Theatres through the viewer.theatres connection.
+
+    The default `query="AMC"` matches every location, making this a full
+    enumeration; pass `coordinates` / attribute filters for a narrower picker
+    search. Pages through the Relay connection via endCursor until exhausted.
+    """
+    owned = session is None
+    session = session or open_graphql_session()
+    variables = {
+        "query": query,
+        "coordinates": coordinates,
+        "includeAttributes": include_attributes,
+        "excludeAttributes": exclude_attributes,
+        "brand": brand,
+        "operation": operation,
+        "first": page_size,
+        "after": None,
+    }
+    theatres = []
+    try:
+        while True:
+            payload = _graphql(session, THEATRES_QUERY, timeout, variables=dict(variables))
+            page, has_next, end_cursor = parse_theatre_page(payload)
+            theatres.extend(page)
+            if not has_next:
+                return tuple(theatres)
+            if not end_cursor:
+                raise ShapeChanged("graphql theatres: hasNextPage without an endCursor")
+            variables["after"] = end_cursor
+    finally:
+        if owned:
+            session.close()
 
 
 _EPOCH = date(1970, 1, 1)

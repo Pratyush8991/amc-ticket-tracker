@@ -7,7 +7,7 @@ SeatPage metadata extraction are literally shared with the RSC side (`parse_seat
 """
 
 from ..errors import ShapeChanged
-from ..model import DiscoveredShowtime, SeatPage
+from ..model import DiscoveredShowtime, SeatPage, Theatre
 from ..parse import _first_edge_node, parse_seats, parse_starts_at, showtime_fields
 
 
@@ -17,6 +17,37 @@ def _viewer(payload, what):
     if not isinstance(viewer, dict):
         raise ShapeChanged(f"{what}: GraphQL response has no viewer")
     return viewer
+
+
+def parse_theatre_page(payload):
+    """Reduce one theatres-connection page to (theatres, has_next_page, end_cursor)."""
+    connection = _viewer(payload, "graphql theatres").get("theatres")
+    if not isinstance(connection, dict) or "edges" not in connection:
+        raise ShapeChanged("graphql theatres: response has no TheatreConnection")
+    page_info = connection.get("pageInfo") or {}
+    theatres = tuple(_theatre(edge.get("node") or {}) for edge in connection.get("edges") or [])
+    return theatres, bool(page_info.get("hasNextPage")), page_info.get("endCursor")
+
+
+def _theatre(node):
+    missing = [k for k in ("theatreId", "slug") if node.get(k) is None]
+    if missing:
+        raise ShapeChanged(f"graphql theatres: theatre missing {', '.join(missing)}")
+    return Theatre(
+        theatre_id=int(node["theatreId"]),
+        slug=node["slug"],
+        name=node.get("name") or "",
+        city=node.get("city") or "",
+        state=node.get("state") or "",
+        postal_code=node.get("postalCode") or "",
+        latitude=node.get("latitude"),
+        longitude=node.get("longitude"),
+        market_slug=node.get("marketSlug") or "",
+        utc_offset=node.get("utcOffset") or "",
+        timezone_abbreviation=node.get("timezoneAbbreviation") or "",
+        ticketable=bool(node.get("ticketable")),
+        is_in_outage=bool(node.get("isInOutage")),
+    )
 
 
 def parse_discovery(payload, theatre_slug):

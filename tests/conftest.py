@@ -149,6 +149,16 @@ def graphql_responding(**kwargs):
     return FakeGraphQLSession(lambda posted: FakeGraphQLResponse(**kwargs))
 
 
+def graphql_paging(fixture_by_cursor):
+    """A session that serves connection pages keyed off the posted `after` cursor."""
+
+    def handler(posted):
+        after = (posted.get("variables") or {}).get("after")
+        return FakeGraphQLResponse(payload=load_graphql(fixture_by_cursor[after]))
+
+    return FakeGraphQLSession(handler)
+
+
 def responding(**kwargs):
     """A session that answers every request with one canned response."""
     return FakeSession(lambda url: FakeResponse(url=url, **kwargs))

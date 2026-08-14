@@ -39,6 +39,29 @@ class Seat:
 
 
 @dataclass(frozen=True)
+class Theatre:
+    """One AMC location as the GraphQL theatres connection reports it.
+
+    The `slug` is the load-bearing field — it is what the showtime-discovery query
+    targets (CONTEXT.md, "Theatre"); the rest powers theatre pickers and geo search.
+    """
+
+    theatre_id: int
+    slug: str
+    name: str
+    city: str
+    state: str
+    postal_code: str
+    latitude: float | None
+    longitude: float | None
+    market_slug: str
+    utc_offset: str
+    timezone_abbreviation: str
+    ticketable: bool
+    is_in_outage: bool
+
+
+@dataclass(frozen=True)
 class DiscoveredShowtime:
     """One screening as Discovery reports it — already whole.
 
