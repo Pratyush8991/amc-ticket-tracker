@@ -86,10 +86,18 @@ a 429, a dead showtime ID, or a changed page shape are all reported distinctly, 
 Showtime IDs enter the system by hand, because AMC's listings are queue-walled and you
 are the one who can walk through the queue. Paste bare IDs, full seat-page URLs, or a mix:
 
-```bash
-export DATABASE_URL=postgresql+psycopg://localhost/amc_watch
-uv run alembic upgrade head
+The Registry lives in Postgres, so point `DATABASE_URL` at one and apply the schema. Any
+Postgres will do — a container, Postgres.app, a managed instance:
 
+```bash
+export DATABASE_URL=postgresql+psycopg://USER:PASSWORD@localhost:5432/amc_watch
+uv run alembic upgrade head
+```
+
+Keep that export in your shell profile; every command below needs it, and without it you
+get a `FAIL` telling you exactly this. Then:
+
+```bash
 uv run amc-watch contribute 144696966 https://www.amctheatres.com/showtimes/145377422/seats
 uv run amc-watch enrich
 ```
