@@ -480,3 +480,26 @@ seat-page fetcher as the fallback (different surface, fails independently).
 - `curl_cffi` (TLS impersonation): <https://github.com/lexiforest/curl_cffi>
 </content>
 </invoke>
+
+---
+
+## Addendum — live schema corrections from the fetch-core build (2026-08-14, #15)
+
+Server-side introspection and single live calls through `curl_cffi` while building the
+GraphQL backend corrected three shape assumptions above:
+
+- **`Showtime.format` is `ShowtimeMovieFormat`** (`id, attributes, groups, movie`), *not*
+  a Relay connection — the `format { edges … }` shape exists only inside the RSC page
+  embed. On live discovery rows and live `viewer.showtime` seat reads, `format` comes
+  back **null**.
+- **Where the format identity actually lives:** on discovery rows it is the enclosing
+  `formats.items[].attributes` list, most specific first (the IMAX 70MM tab lists
+  `[imax70mm, imax, 70mm]`); on a seat read it is the showtime's own `attributes`
+  AttributeConnection, format attribute first (the RSC embed shows the same ordering).
+- **`Showtime.auditorium` is a bare `Int`**, and GraphQL validation errors ride the body
+  of an HTTP **400** — read the body before trusting the status code.
+
+Confirmed live the same day, residential IP: the discovery query returned 69 showtimes
+for `amc-metreon-16` (business date via the session cookie) and the seat query parsed a
+full 186-seat Dolby layout into a SeatPage. Plain `requests` still 403s the host with a
+Cloudflare challenge; `curl_cffi` (chrome impersonation, warmed jar) passes.
