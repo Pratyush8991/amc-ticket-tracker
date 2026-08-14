@@ -39,7 +39,16 @@ cap is hit, the slow lane stretches further; the fast lane is protected.
 **Seat Criteria** — the block of acceptable seats for a Watch: row letters plus a
 seat-number range, always chosen against the *actual* auditorium layout (rendered from an
 already-fetched Seat Page, screen shown for orientation, missing rows preserved — AMC
-skips rows like "I"), never guessed blind.
+skips rows like "I"), never guessed blind. Criteria are expressed in *printed* seat names
+(the "N7" a human reads off a ticket), which are a different coordinate system from the
+Grid Position below.
+
+**Grid Position** — a seat's `row`/`column` in the Seat Page's layout grid, as distinct
+from its printed name. The two are not interchangeable and need not even run in the same
+direction: in Metreon 16's IMAX house, seat K34 sits at grid column 1 and K1 at column 34,
+so printed numbers descend as grid columns ascend. Adjacency is therefore *only* ever
+computed on Grid Positions — two seats with consecutive printed numbers are neighbours by
+accident of layout, not by rule.
 
 **Party Size** — how many adjacent seats a Watch requires. A Watch field, default 2.
 
@@ -49,9 +58,9 @@ bookability, and only Bookable seats count toward an Opening.
 
 **Opening** — Party Size (or more) adjacent Bookable seats, all within a Watch's Seat
 Criteria, in one Showtime. The unit of alerting: a Watch fires when a new Opening
-appears. Adjacency means consecutive grid columns in the same grid row; aisles and
-wheelchair/companion positions occupy their own grid cells, so they break adjacency
-naturally.
+appears. Adjacency means consecutive grid columns in the same grid row (see Grid
+Position — never consecutive printed seat numbers); aisles and wheelchair/companion
+positions occupy their own grid cells, so they break adjacency naturally.
 
 **Channel** — the delivery mechanism by which a user receives Alerts. Pluggable by
 design; initially one private ntfy topic per user (subscribe once, all Watches page

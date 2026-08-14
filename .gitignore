@@ -9,3 +9,6 @@ state.json
 # config.json is committed as a working example (the Actions runner reads it, and it
 # holds no secrets — just public showtime IDs). Your ntfy topic comes from the
 # NTFY_TOPIC secret/env, so it never needs to live in the file.
+
+# uv lockfile is not committed while the dependency set is still churning.
+uv.lock
