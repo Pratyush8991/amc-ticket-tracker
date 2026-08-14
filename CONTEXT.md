@@ -4,37 +4,49 @@ Ubiquitous language for the seat-watching domain. Glossary only — no implement
 
 ## Terms
 
-**Seat Page** — AMC's server-rendered page at `/showtimes/<id>/seats`. The system's *only*
-data source. Self-describing: given a bare showtime ID, it yields the showtime's movie,
-theatre, format, date/time, and the full seat layout. Open to plain HTTP; everything else
-on amctheatres.com is queue-walled.
+**Seat Page** — AMC's server-rendered page at `www.amctheatres.com/showtimes/<id>/seats`.
+A *seat-read fallback*, no longer the system's data source: given a bare showtime ID it
+yields the showtime's movie, theatre, format, date/time, and full seat layout (a
+`seatingLayout` object in the Next.js RSC payload). Open to plain HTTP with a browser
+User-Agent, and it fails independently of the GraphQL seat query, so it backstops seat
+reads — never Discovery. The primary data source is now AMC's public GraphQL API
+(theatres, showtimes, seat layouts; see **Discovery**); the queue-walled HTML *listing*
+pages stay unusable for enumeration.
+
+**Theatre** — a Registry entry for one AMC location: `theatreId`, `slug`, `name`,
+location (city/state/coordinates), and its attributes/formats. Sourced from AMC's GraphQL
+`viewer.theatres` search (free-text query, coordinates, attribute filters, cursor
+pagination). Theatres power Discovery targeting — a `slug` is what the showtime-enumeration
+query needs — and back the theatre pickers in Watch creation.
 
 **Showtime** — one screening (movie × theatre × auditorium × date/time × format),
-identified by AMC's numeric showtime ID. Enriched automatically from its Seat Page;
-no human ever supplies showtime metadata.
+identified by AMC's numeric showtime ID. Arrives pre-enriched from Discovery — the GraphQL
+showtime rows already carry movie, format, start time and auditorium — so there is no
+separate enrichment fetch and no human ever supplies showtime metadata.
 
-**Registry** — the shared pool of known Showtimes. Grows only by Contribution; AMC's
-listings cannot be scraped (Queue-it waiting room). Shared across all users: once any
-user contributes a showtime, every matching Watch covers it.
+**Registry** — the shared pool of known Showtimes (and the Theatres they play at). Grows
+only by automated **Discovery** — there is no manual contribution path. Shared across all
+users: once Discovery finds a showtime, every matching Watch covers it.
 
-**Contribution** — the act of submitting bare showtime IDs to the Registry, either by
-pasting or via the Bookmarklet. The only manual step in the whole system.
-
-**Bookmarklet** — a browser helper that harvests every showtime ID from whatever AMC page
-a user legitimately has open (they pass the queue as a human) and submits them as a
-Contribution in one tap.
+**Discovery** — automated enumeration of Showtimes through AMC's public GraphQL API
+(`viewer.theatre(slug){…showtimes…}`), the *sole* way Showtimes enter the Registry. The
+rows come back pre-enriched (movie, format, start time, auditorium), so no separate
+enrichment fetch follows. Runs as a pass inside the poller, targeting the distinct
+theatres and movies of active Watches; there is no human step. The business date is driven
+by a `session` cookie, so Discovery loops forward day by day and unions the showtime IDs.
 
 **Format** — AMC's presentation format for a showtime (e.g. `imax70mm`, Dolby Cinema,
-InfinityVision), as reported by the Seat Page. A format implies an auditorium in practice,
-which is why seat criteria are chosen per format — the system never models auditoriums
-directly.
+InfinityVision), carried on the discovery rows as a format `code` + `name`. A format
+implies an auditorium in practice, which is why seat criteria are chosen per format — the
+system never models auditoriums directly.
 
-**Polling Budget** — the hard global ceiling on Seat Page requests per minute, shared by
+**Polling Budget** — the hard global ceiling on outbound requests per minute, shared by
 everything the system watches. The scarce resource of the whole domain: AMC's tolerance,
-not compute, is the limit. Spent through two lanes — the **fast lane** (imminent
+not compute, is the limit. Spent through three lanes — the **discovery lane** (GraphQL
+theatre-enumeration passes, slow), and two seat-read lanes: the **fast lane** (imminent
 showtimes, recent seat churn, or a Watch marked **hot**, e.g. on-sale day) polled ~every
 minute, and the **slow lane** (everything else) polled on a stretched interval. When the
-cap is hit, the slow lane stretches further; the fast lane is protected.
+cap is hit, the slow and discovery lanes stretch further; the fast lane is protected.
 
 **Seat Criteria** — the block of acceptable seats for a Watch: row letters plus a
 seat-number range, always chosen against the *actual* auditorium layout (rendered from an
@@ -74,7 +86,7 @@ open, but an Opening that closes and later reopens pages again.
 **Watch** — a user's standing intent to be alerted about bookable seat openings,
 expressed as a *selector* over the Registry: movie + theatre + format, optionally
 narrowed by a date/time window, plus seat criteria and party size. Every Showtime in the
-Registry that matches the selector is covered automatically, including ones contributed
+Registry that matches the selector is covered automatically, including ones discovered
 after the Watch was created. A user wanting two formats creates two Watches.
 Lifecycle: **active** → (**paused** ⇄ active) → **done** (user got tickets) or
 **expired** (last covered Showtime's start time has passed — automatic). Only active

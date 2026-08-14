@@ -1,5 +1,7 @@
 # Seat pages are the only AMC data source; showtime discovery is human contribution
 
+> **Superseded by [0005](0005-graphql-discovery.md)** (2026-08-14): discovery is now automated via AMC's public GraphQL; human Contribution and the Bookmarklet are removed. The historical record below stands.
+
 AMC's listing and theatre pages 302 into a Queue-it waiting room ("Global Safety Net",
 verified 2026-07-21) and the v2 API requires a vendor key, but the per-showtime Seat Page
 (`/showtimes/<id>/seats`) remains server-rendered and open to plain HTTP — and it is

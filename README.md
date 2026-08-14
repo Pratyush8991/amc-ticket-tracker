@@ -15,23 +15,38 @@ progress; see **Status** below for what actually runs today.
 
 ## How it works
 
-AMC's seat page
+AMC's own web app reads showtimes and seat maps from a public GraphQL endpoint:
 
 ```
-https://www.amctheatres.com/showtimes/<showtime_id>/seats
+POST https://graph.amctheatres.com/
 ```
 
-is **server-rendered**: the entire seat layout is embedded in the page (a `seatingLayout`
-object in the Next.js RSC payload), along with the movie, theatre, format and start time.
-So a plain `requests.get()` with a browser User-Agent returns everything — and a *bare
-showtime ID is enough*, because the page describes itself. No vendor key, no headless
-browser.
+Ordinary browser cookies authorize it — **no vendor key, no headless browser** — and it
+sits **off the Queue-it path** that walls AMC's HTML listing pages. Three queries cover the
+whole pipeline:
 
-That matters more than it sounds, because AMC's listing and theatre pages now redirect
-into a Queue-it waiting room. Seat pages are the only door left, so showtime IDs enter the
-system by human contribution rather than by crawling (ADR-0001).
+- **`viewer.theatres(query, coordinates, …)`** seeds and searches the **Theatre** registry
+  (`query: "AMC"` lists every theatre, paged by cursor). Each node carries `theatreId`,
+  `slug`, `name`, location and formats.
+- **`viewer.theatre(slug){ … showtimes … }`** is **Discovery**: it enumerates a theatre's
+  showtimes, and the rows come back **pre-enriched** — `showtimeId`, `showDateTimeUtc`,
+  `status`, `auditorium`, format `code`/`name`, and `movie` — so there is no second
+  enrichment fetch. The target business date rides a `session` cookie, so the poller loops
+  forward day by day.
+- **`viewer.showtime(id){ seatingLayout { … } }`** returns the seat map as clean JSON
+  (`name`, `row`, `column`, `available`, `seatStatus`, `type`, `shouldDisplay`).
 
-Three things fall out of the layout grid:
+Discovery is fully automated: the poller enumerates the theatres and movies its active
+Watches care about and feeds the `showtimeId`s straight into the Registry. No human pastes
+IDs (ADR-0005).
+
+The older seat-page scrape survives as a **seat-read fallback only**. The same
+`seatingLayout` is embedded in the server-rendered page at
+`www.amctheatres.com/showtimes/<id>/seats` (in the Next.js RSC payload), which a plain
+`requests.get()` with a browser User-Agent still fetches. It fails independently of
+GraphQL, so it backstops seat reads — but it is never a discovery route.
+
+Three things fall out of the seat layout grid, and all three still hold:
 
 - **Adjacency** is consecutive grid *columns* in the same grid row. Aisles and
   wheelchair/companion seats occupy their own columns, so they break adjacency for free.
@@ -47,13 +62,14 @@ The rebuild is landing in slices, tracked in GitHub issues. What exists today:
 
 | Area | State |
 | --- | --- |
-| `fetch_core` — Seat Page GET + RSC parse, error taxonomy | working |
+| `fetch_core` — RSC seat-page GET + parse, error taxonomy (seat-read fallback) | working |
 | `amc-watch smoke-test` — the first act on any new box | working |
 | Test harness — ephemeral Postgres, Alembic baseline, recorded fixtures | working |
-| `registry` — contribution + enrichment | skeleton (#3) |
+| `discovery` — GraphQL theatre + showtime fetch (`curl_cffi`), cookie/session-date warming | planned |
+| `registry` — automated discovery, pre-enriched showtimes | skeleton (#3) |
 | `watching` — selectors, lifecycle, Opening computation | skeleton (#4, #6) |
 | `alerting` — ntfy Channel, dedup ledger | skeleton (#4) |
-| `web` — invites, watch management, seat picker, bookmarklet | skeleton (#8–#12) |
+| `web` — invites, watch management, seat picker | skeleton (#8–#12) |
 
 The single-user script this grew out of — flat `config.json`, `state.json`, the Actions
 cron and the launchd plist — has been retired. It is preserved in git history (before
@@ -72,21 +88,25 @@ uv run amc-watch smoke-test
 ```
 
 ```
-GET https://www.amctheatres.com/showtimes/145377422/seats
+GraphQL  POST https://graph.amctheatres.com/ (curl_cffi)
+PASS: graph.amctheatres.com reachable — theatre + showtime queries answer
+Seats    GET https://www.amctheatres.com/showtimes/145377422/seats
 PASS: The Odyssey - IMAX 70MM (imax70mm) at AMC Metreon 16, 2026-08-15 17:00 UTC
-      437 seats in the layout, 1 bookable right now
+       437 seats in the layout, 1 bookable right now
 ```
 
-A `FAIL` tells you which wall you hit and what to do about it — a queue redirect, a 403,
-a 429, a dead showtime ID, or a changed page shape are all reported distinctly, because
-"AMC blocked us" and "no seats are open" must never look alike.
+It checks both surfaces the system depends on: the GraphQL host (reached with `curl_cffi`,
+since plain `requests`/`curl` get a 403 there) and the RSC seat-page host (plain
+`requests`). A `FAIL` tells you which wall you hit and what to do about it — a queue
+redirect, a 403, a 429, a dead showtime ID, or a changed page/response shape are all
+reported distinctly, because "AMC blocked us" and "no seats are open" must never look
+alike.
 
-Showtimes pass, so the built-in default rots within days; override it with
-`--showtime-id <id>` or `AMC_SMOKE_TEST_SHOWTIME_ID`. Getting a current ID means opening
-a showtime through to its seat map yourself and copying the number out of the URL —
-listings are queue-walled, and guessing IDs by probing near a known one is the range
-probing ADR-0001 rejected. ID waves are not contiguous anyway (Aug 9 was `1446969xx`,
-Aug 15 `1453774xx`), so probing would fail *and* spend bot-detection risk.
+Discovery supplies showtime IDs automatically now, so you never hunt one down by hand. The
+smoke test still pins a specific ID for its seat-read check; that default rots within days,
+so override it with `--showtime-id <id>` or `AMC_SMOKE_TEST_SHOWTIME_ID` when it goes
+stale. ID waves are not contiguous (Aug 9 was `1446969xx`, Aug 15 `1453774xx`) — one more
+reason discovery enumerates them rather than guessing.
 
 ## Tests
 
@@ -117,8 +137,11 @@ checkout.
 - **It's a scraper, so it's brittle.** If AMC changes the page shape you get a loud
   `SeatPageShapeChanged`, never a quiet "no seats". The fix lives in
   `src/amc_watch/fetch_core/parse.py`.
-- **The transport is load-bearing.** python-requests with browser headers passes AMC's
-  Cloudflare hardening where curl gets a 403. Don't casually port it (ADR-0003).
+- **The transport is load-bearing, and it's two-tier.** The GraphQL host
+  (`graph.amctheatres.com`) 403s plain `requests` *and* `curl`; it answers only a
+  browser-accurate TLS fingerprint, so discovery runs on `curl_cffi` with a warmed cookie
+  jar and the session-date cookie. The RSC seat-page host still passes with plain
+  python-requests and browser headers. Don't casually port either (ADR-0003, amended).
 - **AMC's tolerance is the bottleneck, not compute.** Polling is budgeted globally on
   purpose. A handful of hand-run probes from one box was enough to draw a 429 on
   2026-07-28, which is roughly how much headroom there is.

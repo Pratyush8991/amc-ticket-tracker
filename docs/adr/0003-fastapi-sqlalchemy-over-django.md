@@ -11,3 +11,12 @@ request/response models pay off there.
 Django was the velocity pick and remains worth remembering: free admin UI (registry and
 watch inspection during the invite-only era), sessions/auth, and migrations wiring all
 come built in. We accepted hand-rolling those in exchange for the API-first skeleton.
+
+## Amendment (2026-08-14)
+
+Transport is now backend-specific. The GraphQL data surface (`graph.amctheatres.com`,
+adopted for discovery + seats in ADR-0005) 403s plain python-requests *and* curl, so it is
+fetched with `curl_cffi` (browser TLS fingerprint) + a warmed cookie jar. python-requests
+stays load-bearing for the RSC seat-page host (`www.amctheatres.com`), where it still
+passes and curl 403s. The "requests, not curl" lesson holds per-host; the general fix when
+`requests` gets fingerprinted is `curl_cffi`, not a headless browser.
