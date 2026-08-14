@@ -122,7 +122,16 @@ def parse_showtime(text):
     if at == -1:
         raise ShapeChanged("showtime metadata: showDateTimeUtc not found")
     start = _enclosing_object_start(text, at, "showtime metadata")
-    obj = _decode_object_at(text, start, "showtime metadata")
+    return showtime_fields(_decode_object_at(text, start, "showtime metadata"))
+
+
+def showtime_fields(obj):
+    """Reduce a showtime object to the SeatPage metadata fields.
+
+    The RSC payload embeds the very object the GraphQL `viewer.showtime` query returns
+    (the Next.js server ran that query for us), so this extraction is shared by both
+    backends — one definition of what a SeatPage needs.
+    """
     fmt = _first_edge_node(obj, "format")
     movie = obj.get("movie") or {}
     theatre = obj.get("theatre") or {}
