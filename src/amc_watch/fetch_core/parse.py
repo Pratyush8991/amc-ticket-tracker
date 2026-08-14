@@ -17,7 +17,7 @@ import json
 import re
 from datetime import datetime
 
-from .errors import SeatPageShapeChanged
+from .errors import ShapeChanged
 from .model import Seat, SeatPage
 
 _LAYOUT_RE = re.compile(r'"seatingLayout"\s*:\s*')
@@ -38,9 +38,9 @@ def _decode_object_at(text, start, what):
     try:
         obj, _ = json.JSONDecoder().raw_decode(text, start)
     except json.JSONDecodeError as e:
-        raise SeatPageShapeChanged(f"{what}: object did not decode ({e})") from e
+        raise ShapeChanged(f"{what}: object did not decode ({e})") from e
     if not isinstance(obj, dict):
-        raise SeatPageShapeChanged(f"{what}: did not decode to an object")
+        raise ShapeChanged(f"{what}: did not decode to an object")
     return obj
 
 
@@ -59,7 +59,7 @@ def _enclosing_object_start(text, at, what):
             if depth == 0:
                 return i
             depth -= 1
-    raise SeatPageShapeChanged(f"{what}: no enclosing object before anchor")
+    raise ShapeChanged(f"{what}: no enclosing object before anchor")
 
 
 def extract_layout(text):
@@ -69,13 +69,13 @@ def extract_layout(text):
     """
     m = _LAYOUT_RE.search(text)
     if not m:
-        raise SeatPageShapeChanged("seat layout: seatingLayout not found in payload")
+        raise ShapeChanged("seat layout: seatingLayout not found in payload")
     at = text.find("{", m.end())
     if at == -1:
-        raise SeatPageShapeChanged("seat layout: seatingLayout has no object value")
+        raise ShapeChanged("seat layout: seatingLayout has no object value")
     layout = _decode_object_at(text, at, "seat layout")
     if "seats" not in layout:
-        raise SeatPageShapeChanged("seat layout: seatingLayout has no seats")
+        raise ShapeChanged("seat layout: seatingLayout has no seats")
     return layout
 
 
@@ -107,7 +107,7 @@ def parse_seats(layout):
             )
         )
     if not seats:
-        raise SeatPageShapeChanged("seat layout: no nameable seats in seatingLayout")
+        raise ShapeChanged("seat layout: no nameable seats in seatingLayout")
     return tuple(seats)
 
 
@@ -120,7 +120,7 @@ def parse_showtime(text):
     """Pull Showtime/Format/movie/theatre metadata out of an unescaped payload."""
     at = text.find(_SHOWTIME_KEY)
     if at == -1:
-        raise SeatPageShapeChanged("showtime metadata: showDateTimeUtc not found")
+        raise ShapeChanged("showtime metadata: showDateTimeUtc not found")
     start = _enclosing_object_start(text, at, "showtime metadata")
     obj = _decode_object_at(text, start, "showtime metadata")
     fmt = _first_edge_node(obj, "format")
@@ -130,7 +130,7 @@ def parse_showtime(text):
     try:
         starts_at_utc = datetime.fromisoformat(raw_start.replace("Z", "+00:00"))
     except (AttributeError, ValueError) as e:
-        raise SeatPageShapeChanged(
+        raise ShapeChanged(
             f"showtime metadata: unreadable showDateTimeUtc {raw_start!r}"
         ) from e
     missing = [
@@ -146,7 +146,7 @@ def parse_showtime(text):
         if v is None
     ]
     if missing:
-        raise SeatPageShapeChanged(f"showtime metadata: missing {', '.join(missing)}")
+        raise ShapeChanged(f"showtime metadata: missing {', '.join(missing)}")
     return {
         "showtime_id": int(obj["showtimeId"]),
         "movie_id": int(movie["movieId"]),
@@ -162,7 +162,7 @@ def parse_showtime(text):
 def parse_seat_page(html):
     """Parse a raw Seat Page response body into a SeatPage.
 
-    Raises SeatPageShapeChanged if the payload no longer looks like a Seat Page — never
+    Raises ShapeChanged if the payload no longer looks like a Seat Page — never
     returns a SeatPage with no seats to mean that.
     """
     text = unescape_payload(html)

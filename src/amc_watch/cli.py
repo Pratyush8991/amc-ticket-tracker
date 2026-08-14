@@ -16,8 +16,8 @@ from .fetch_core import (
     AccessBlocked,
     QueueWalled,
     RateLimited,
-    SeatPageError,
-    SeatPageShapeChanged,
+    FetchError,
+    ShapeChanged,
     ShowtimeNotFound,
     fetch_seat_page,
     seat_page_url,
@@ -50,7 +50,7 @@ REMEDIES = {
         "AMC rate-limited this box. This one is our fault, not theirs: wait several "
         "minutes before retrying, and do not tighten the Polling Budget on this box."
     ),
-    SeatPageShapeChanged: (
+    ShapeChanged: (
         "The page loaded but carried no seatingLayout. Either AMC changed the payload "
         "shape (everything is blind until the parser is updated) or this is a "
         "challenge/interstitial page."
@@ -69,7 +69,7 @@ def smoke_test(showtime_id, session=None, out=None):
 
     try:
         page = fetch_seat_page(showtime_id, session=session)
-    except SeatPageError as e:
+    except FetchError as e:
         print(f"FAIL: {e}", file=out)
         remedy = REMEDIES.get(type(e))
         if remedy:

@@ -17,7 +17,7 @@ from .errors import (
     AccessBlocked,
     QueueWalled,
     RateLimited,
-    SeatPageUnavailable,
+    FetchUnavailable,
     ShowtimeNotFound,
 )
 from .parse import parse_seat_page
@@ -67,13 +67,13 @@ def _classify(response, showtime_id):
     if response.status_code == 429:
         raise RateLimited("HTTP 429 — asking too often", showtime_id)
     if not response.ok:
-        raise SeatPageUnavailable(f"HTTP {response.status_code}", showtime_id)
+        raise FetchUnavailable(f"HTTP {response.status_code}", showtime_id)
 
 
 def fetch_seat_page(showtime_id, session=None, timeout=DEFAULT_TIMEOUT):
     """Fetch and parse one Seat Page.
 
-    Returns a SeatPage. Raises a SeatPageError subclass if AMC did not give us a
+    Returns a SeatPage. Raises a FetchError subclass if AMC did not give us a
     trustworthy answer — a Seat Page with every seat sold is a *successful* fetch that
     returns a SeatPage with no bookable seats, never an exception.
     """
@@ -85,7 +85,7 @@ def fetch_seat_page(showtime_id, session=None, timeout=DEFAULT_TIMEOUT):
                 seat_page_url(showtime_id), headers=HEADERS, timeout=timeout
             )
         except requests.RequestException as e:
-            raise SeatPageUnavailable(f"request failed: {e}", showtime_id) from e
+            raise FetchUnavailable(f"request failed: {e}", showtime_id) from e
         _classify(response, showtime_id)
         return parse_seat_page(response.text)
     finally:
