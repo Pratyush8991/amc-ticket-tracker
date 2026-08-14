@@ -69,18 +69,23 @@ def parse_discovery(payload, theatre_slug):
 
     rows, seen = [], set()
     for item in (theatre.get("formats") or {}).get("items") or []:
+        # Live rows carry `format: null`; the format identity lives on the enclosing
+        # tab's attributes, most specific first (observed live 2026-08-14 — the
+        # IMAX 70MM tab lists [imax70mm, imax, 70mm]).
+        tab_attributes = item.get("attributes") or []
+        tab_format = tab_attributes[0] if tab_attributes else {}
         for group_edge in (item.get("groups") or {}).get("edges") or []:
             showtimes = ((group_edge.get("node") or {}).get("showtimes") or {}).get("edges") or []
             for edge in showtimes:
-                row = _discovered_row(edge.get("node") or {}, theatre, theatre_slug)
+                row = _discovered_row(edge.get("node") or {}, theatre, theatre_slug, tab_format)
                 if row.showtime_id not in seen:
                     seen.add(row.showtime_id)
                     rows.append(row)
     return tuple(rows)
 
 
-def _discovered_row(node, theatre, theatre_slug):
-    fmt = _format_of(node)
+def _discovered_row(node, theatre, theatre_slug, tab_format):
+    fmt = _format_of(node) or tab_format
     movie = node.get("movie") or {}
     missing = [
         k

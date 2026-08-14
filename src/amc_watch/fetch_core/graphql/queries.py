@@ -98,6 +98,7 @@ _SEAT_QUERY = """
       showtimeId
       showDateTimeUtc
       format { attributes { code name } }
+      attributes { edges { node { code name } } }
       movie { movieId name }
       theatre { theatreId name }
       seatingLayout {

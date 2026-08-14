@@ -56,11 +56,12 @@ def main():
     showtime = _object_around(text, '"showDateTimeUtc"')
     layout = _object_after(text, '"seatingLayout"')
 
-    # The RSC embed types `format` as a Relay connection, but the live GraphQL schema
-    # types it as ShowtimeMovieFormat with a plain `attributes` list (introspected
-    # 2026-08-14) — reshape so the fixture matches what the server returns to *us*.
-    format_attributes = [
-        e["node"] for e in (showtime.get("format") or {}).get("edges") or []
+    # Live (2026-08-14), viewer.showtime answers `format: null`; the format identity
+    # rides the AttributeConnection instead, format attribute first — exactly the
+    # `attributes` edges the RSC embed also carries, which is what we copy here.
+    attribute_edges = [
+        {"node": {"code": e["node"]["code"], "name": e["node"]["name"]}}
+        for e in (showtime.get("attributes") or {}).get("edges") or []
     ]
 
     response = {
@@ -69,7 +70,8 @@ def main():
                 "showtime": {
                     "showtimeId": showtime["showtimeId"],
                     "showDateTimeUtc": showtime["showDateTimeUtc"],
-                    "format": {"attributes": format_attributes},
+                    "format": None,
+                    "attributes": {"edges": attribute_edges},
                     "movie": {
                         "movieId": showtime["movie"]["movieId"],
                         "name": showtime["movie"]["name"],

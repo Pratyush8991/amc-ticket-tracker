@@ -119,17 +119,21 @@ def _first_edge_node(obj, key):
 def _format_of(obj):
     """A showtime object's Format node — {code, name}.
 
-    The same idea arrives in two shapes: the RSC payload embeds `format` as a Relay
-    connection (edges/node), while the live GraphQL schema types it as
-    ShowtimeMovieFormat with a plain `attributes` list (introspected 2026-08-14).
-    First entry of whichever shape arrived; missing → {} and the caller's
-    required-field check reports it.
+    The same idea arrives in three shapes (all observed 2026-08-14): the RSC payload
+    embeds `format` as a Relay connection (edges/node); the discovery schema types it
+    as ShowtimeMovieFormat with a plain `attributes` list; and the live seat read
+    answers `format: null` with the identity riding the showtime's own
+    AttributeConnection instead — format attribute first, as the RSC embed's
+    attribute order also shows. First entry of whichever shape arrived; missing → {}
+    and the caller's required-field check reports it.
     """
     container = obj.get("format") or {}
     if "edges" in container:
         return _first_edge_node(obj, "format")
     attributes = container.get("attributes") or []
-    return attributes[0] if attributes else {}
+    if attributes:
+        return attributes[0]
+    return _first_edge_node(obj, "attributes")
 
 
 def parse_starts_at(raw, what):

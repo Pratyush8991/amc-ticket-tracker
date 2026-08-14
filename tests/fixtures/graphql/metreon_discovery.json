@@ -12,6 +12,14 @@
         {
          "name": "IMAX 70MM",
          "code": "imax70mm"
+        },
+        {
+         "name": "IMAX at AMC",
+         "code": "imax"
+        },
+        {
+         "name": "70mm",
+         "code": "70mm"
         }
        ],
        "groups": {
@@ -27,14 +35,7 @@
                "status": "Scheduled",
                "auditorium": 15,
                "isReservedSeating": true,
-               "format": {
-                "attributes": [
-                 {
-                  "code": "imax70mm",
-                  "name": "IMAX 70MM"
-                 }
-                ]
-               },
+               "format": null,
                "movie": {
                 "name": "The Odyssey",
                 "slug": "the-odyssey",
@@ -57,14 +58,7 @@
                "status": "Scheduled",
                "auditorium": 15,
                "isReservedSeating": true,
-               "format": {
-                "attributes": [
-                 {
-                  "code": "imax70mm",
-                  "name": "IMAX 70MM"
-                 }
-                ]
-               },
+               "format": null,
                "movie": {
                 "name": "The Odyssey",
                 "slug": "the-odyssey",
@@ -82,7 +76,7 @@
       {
        "attributes": [
         {
-         "name": "IMAX",
+         "name": "IMAX at AMC",
          "code": "imax"
         }
        ],
@@ -99,14 +93,7 @@
                "status": "Scheduled",
                "auditorium": 15,
                "isReservedSeating": true,
-               "format": {
-                "attributes": [
-                 {
-                  "code": "imax70mm",
-                  "name": "IMAX 70MM"
-                 }
-                ]
-               },
+               "format": null,
                "movie": {
                 "name": "The Odyssey",
                 "slug": "the-odyssey",
@@ -141,14 +128,7 @@
                "status": "OnSale",
                "auditorium": 6,
                "isReservedSeating": true,
-               "format": {
-                "attributes": [
-                 {
-                  "code": "infinityvision",
-                  "name": "InfinityVision"
-                 }
-                ]
-               },
+               "format": null,
                "movie": {
                 "name": "Avengers: Doomsday",
                 "slug": "avengers-doomsday",
