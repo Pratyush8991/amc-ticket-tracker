@@ -73,6 +73,15 @@ def test_a_token_that_is_not_a_showtime_is_reported_and_does_not_stop_the_rest(d
     assert [s.showtime_id for s in list_showtimes(db_session)] == [144696966]
 
 
+def test_digits_that_are_not_arabic_numerals_are_rejected_not_reinterpreted(db_session):
+    """AMC IDs are ASCII. `str.isdigit()` is not: it accepts ² (which int() rejects) and
+    ١٤٤ (which int() silently reads as 144 — a showtime nobody contributed)."""
+    outcomes = contribute(db_session, ["²", "١٤٤", "144696966"])
+
+    assert [o.status for o in outcomes] == ["invalid", "invalid", "new"]
+    assert [s.showtime_id for s in list_showtimes(db_session)] == [144696966]
+
+
 def test_a_dead_showtime_id_is_reported_and_never_costs_another_fetch(db_session):
     """A 404 is permanent, and Polling Budget is the scarce resource — so ask once."""
     contribute(db_session, ["999999999"])
@@ -112,6 +121,38 @@ def test_a_queue_walled_fetch_leaves_the_showtime_for_the_next_pass(db_session, 
     (retried,) = enrich_pending(db_session, session=as_recorded)
     assert retried.status == "enriched"
     assert list_showtimes(db_session)[0].movie_name == "The Odyssey"
+
+
+def test_each_kind_of_wall_is_reported_under_its_own_name(db_session):
+    """A door, a line and a changed payload need opposite reactions from an operator.
+
+    errors.py draws these distinctions precisely so they cannot be collapsed; a 403 filed
+    as "queued" invites someone to retry the one thing that will not work.
+    """
+    walls = {
+        "blocked": responding(status_code=403),
+        "throttled": responding(status_code=429),
+        "unreadable": responding(text="<html>not a seat page</html>"),
+        "unreachable": responding(status_code=500),
+    }
+    for expected, amc in walls.items():
+        contribute(db_session, ["144696966"])
+        (outcome,) = enrich_pending(db_session, session=amc)
+        assert outcome.status == expected, f"{expected} wall reported as {outcome.status}"
+        # Not a verdict about the Showtime: only AMC denying it exists is that.
+        assert enrich_pending(db_session, session=amc)[0].status == expected
+
+
+def test_a_very_long_driver_complaint_does_not_abort_the_pass(db_session):
+    """`last_error` is a bounded column and Postgres raises rather than truncating, so an
+    SSL error's several hundred characters would otherwise kill the whole pass."""
+    sprawling = "x" * 4000
+    contribute(db_session, ["144696966"])
+
+    (outcome,) = enrich_pending(db_session, session=responding(text=sprawling))
+
+    assert outcome.status == "unreadable"
+    assert len(list_showtimes(db_session)[0].last_error) <= 500
 
 
 def test_a_format_nobody_has_recorded_yet_is_stored_exactly_as_reported(db_session):

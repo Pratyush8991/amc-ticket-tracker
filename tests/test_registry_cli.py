@@ -6,7 +6,10 @@ and read what it printed — the database and the parser are real, only `session
 faked.
 """
 
+from datetime import datetime, timezone
+
 from amc_watch.cli import main
+from amc_watch.registry import list_showtimes
 
 from .conftest import QUEUE_URL, FakeResponse, FakeSession, Redirect, responding, serving_each
 from .test_registry import TWO_HOUSES
@@ -99,6 +102,51 @@ def test_the_registry_shows_rows_that_are_still_waiting_to_be_enriched(db_sessio
     out = capsys.readouterr().out
     assert CONTRIBUTED in out
     assert "pending" in out
+
+
+def test_contributing_with_enrich_only_fetches_what_you_contributed(db_session, capsys):
+    """Polling Budget is global and the Registry is shared: typing one ID must not fire a
+    fetch for every pending row anyone else ever contributed."""
+    already_waiting = [str(showtime_id) for showtime_id in TWO_HOUSES]
+    main(["contribute", *already_waiting], db=db_session)
+    capsys.readouterr()
+    amc = serving_each({144696966: "metreon_imax70mm_as_recorded"})
+
+    main(["contribute", "144696966", "--enrich"], db=db_session, session=amc)
+
+    assert [request["url"] for request in amc.requests] == [
+        "https://www.amctheatres.com/showtimes/144696966/seats"
+    ]
+
+
+def test_a_showtime_that_died_after_enrichment_is_not_still_listed_as_enriched(
+    db_session, capsys, as_recorded
+):
+    """CONTEXT.md: death can strike long after Enrichment. A listing that still says
+    "enriched" tells someone to keep watching a screening AMC has disowned."""
+    main(["contribute", CONTRIBUTED, "--enrich"], db=db_session, session=as_recorded)
+    stored = list_showtimes(db_session)[0]
+    stored.dead_at = datetime.now(timezone.utc)
+    stored.last_error = "404 — no such showtime"
+    db_session.commit()
+    capsys.readouterr()
+
+    main(["registry"], db=db_session)
+
+    out = capsys.readouterr().out
+    assert "dead" in out
+    assert "enriched" not in out
+
+
+def test_the_database_failure_does_not_print_the_password(capsys, monkeypatch):
+    """The moment this prints is the moment someone pastes it into a bug report."""
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://someone:hunter2@localhost:1/nowhere")
+
+    main(["contribute", CONTRIBUTED])
+
+    out = capsys.readouterr().out
+    assert "hunter2" not in out
+    assert "nowhere" in out
 
 
 def test_an_unreachable_database_is_reported_the_way_a_blocked_box_is(capsys, monkeypatch):

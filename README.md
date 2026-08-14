@@ -84,7 +84,8 @@ a 429, a dead showtime ID, or a changed page shape are all reported distinctly, 
 ### Filling the Registry
 
 Showtime IDs enter the system by hand, because AMC's listings are queue-walled and you
-are the one who can walk through the queue. Paste bare IDs, full seat-page URLs, or a mix:
+are the one who can walk through the queue. You paste bare IDs, full seat-page URLs, or a
+mix of both.
 
 The Registry lives in Postgres, so point `DATABASE_URL` at one and apply the schema. Any
 Postgres will do — a container, Postgres.app, a managed instance:
@@ -110,10 +111,23 @@ human ever types a movie name or a format:
   144696966    enriched   The Odyssey — IMAX 70MM (imax70mm) at AMC Metreon 16, 2026-08-09 17:00 UTC
 ```
 
-Use `contribute --enrich` to do both at once. Every ID you hand it gets a line back —
-`new`, `duplicate`, `invalid`, `dead` (AMC 404s: recorded once and never re-fetched) or
-`queued` (a wall we should retry) — and anything unplaced makes the command exit non-zero,
-so a typo can't disappear. Then browse what's covered:
+Use `contribute --enrich` to do both at once — it enriches only the IDs you just handed
+it, never the whole shared Registry. Every ID gets a line back, and the walls are named
+apart because they call for opposite reactions:
+
+| Result | Means |
+| --- | --- |
+| `new` / `duplicate` | in the Registry; a duplicate is someone else getting there first |
+| `invalid` | not a showtime ID or Seat Page URL — check the typo |
+| `dead` | AMC says no such showtime: recorded once, never re-fetched |
+| `queued` | the Queue-it waiting room. Intermittent; retry |
+| `blocked` | a 403. If this is a fresh cloud box, that's the ADR-0004 contingency |
+| `throttled` | a 429 — our fault. Wait several minutes |
+| `unreadable` | the page carried no `seatingLayout`. Either AMC changed shape or it's a challenge page |
+| `unreachable` | transport failure or an unexpected status |
+
+Anything but `new`, `duplicate` and `enriched` makes the command exit non-zero, so a typo
+can't disappear into a script's success. Then browse what's covered:
 
 ```bash
 uv run amc-watch registry --movie doomsday --theatre metreon

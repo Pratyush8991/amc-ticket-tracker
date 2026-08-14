@@ -6,6 +6,7 @@ migrated Postgres it can write domain rows into.
 
 from datetime import datetime, timezone
 
+import pytest
 from sqlalchemy import inspect, select
 
 from amc_watch.db import Showtime
@@ -24,6 +25,27 @@ def test_the_baseline_migration_applies_to_a_fresh_database(migrated_database):
 
     assert "showtimes" in tables
     assert "alembic_version" in tables
+
+
+def test_a_half_described_showtime_cannot_call_itself_enriched(db_session):
+    """"Enriched" has to mean fully described, or the Registry lies to every reader of it.
+
+    0001 got this from NOT NULL; 0002 made those columns nullable so a Contribution can
+    land before anything is known, and this constraint is what carries the promise since.
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    # Inside a savepoint, so the rejection unwinds itself and leaves the test's own
+    # transaction healthy for teardown.
+    with pytest.raises(IntegrityError), db_session.begin_nested():
+        db_session.add(
+            Showtime(
+                showtime_id=144696966,
+                movie_name="The Odyssey",
+                enriched_at=datetime.now(timezone.utc),  # but no movie_id, theatre, format...
+            )
+        )
+        db_session.flush()
 
 
 def test_a_showtime_survives_a_round_trip(db_session):

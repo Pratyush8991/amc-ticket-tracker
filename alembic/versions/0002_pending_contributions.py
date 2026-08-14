@@ -34,14 +34,37 @@ ENRICHED_COLUMNS = [
 ]
 
 
+# What "enriched" is worth: the Seat Page described the showtime completely, or it did not
+# describe it at all. 0001 got this from NOT NULL; once the columns go nullable the promise
+# has to be restated, or a half-filled row reads as enriched and the formatter dies on the
+# NULL it was told could not be there.
+ENRICHED_MEANS_DESCRIBED = (
+    "enriched_at IS NULL OR ("
+    + " AND ".join(f"{name} IS NOT NULL" for name, _ in ENRICHED_COLUMNS)
+    + ")"
+)
+
+
 def upgrade():
     for name, type_ in ENRICHED_COLUMNS:
         op.alter_column("showtimes", name, existing_type=type_, nullable=True)
     op.add_column("showtimes", sa.Column("dead_at", sa.DateTime(timezone=True), nullable=True))
     op.add_column("showtimes", sa.Column("last_error", sa.String(length=500), nullable=True))
+    op.create_check_constraint("ck_showtimes_enriched_means_described", "showtimes", sa.text(ENRICHED_MEANS_DESCRIBED))
+    # The hot query of the enrichment pass, and of every poller tick after #4: find the
+    # handful of rows still owed a fetch. Partial, so it stays the size of the backlog
+    # rather than the size of the Registry.
+    op.create_index(
+        "ix_showtimes_pending",
+        "showtimes",
+        ["showtime_id"],
+        postgresql_where=sa.text("enriched_at IS NULL AND dead_at IS NULL"),
+    )
 
 
 def downgrade():
+    op.drop_index("ix_showtimes_pending", table_name="showtimes")
+    op.drop_constraint("ck_showtimes_enriched_means_described", "showtimes", type_="check")
     op.drop_column("showtimes", "last_error")
     op.drop_column("showtimes", "dead_at")
     # Unenriched rows have no metadata to invent, so they cannot survive going back.

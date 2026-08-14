@@ -7,7 +7,7 @@ Showtime metadata is never user-supplied (ADR-0001).
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, Integer, String, func
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, Integer, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -30,6 +30,18 @@ class Showtime(Base):
     """
 
     __tablename__ = "showtimes"
+    __table_args__ = (
+        # "Enriched" means fully described or not at all — the promise 0001 got from
+        # NOT NULL and 0002 has to restate now that a bare Contribution can land first.
+        CheckConstraint(
+            "enriched_at IS NULL OR ("
+            "movie_id IS NOT NULL AND movie_name IS NOT NULL "
+            "AND theatre_id IS NOT NULL AND theatre_name IS NOT NULL "
+            "AND format_code IS NOT NULL AND format_name IS NOT NULL "
+            "AND starts_at_utc IS NOT NULL)",
+            name="ck_showtimes_enriched_means_described",
+        ),
+    )
 
     showtime_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
 

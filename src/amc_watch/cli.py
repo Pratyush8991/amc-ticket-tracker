@@ -16,7 +16,8 @@ import argparse
 import os
 import sys
 
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError, OperationalError, ProgrammingError, SQLAlchemyError
 
 from . import registry
 from .db import create_engine_from_env, database_url, session_factory
@@ -97,14 +98,17 @@ def smoke_test(showtime_id, session=None, out=None):
     return 0
 
 
-# An ID we could not place in the Registry. `duplicate` is not here: another friend
-# already contributing it is the system working, not a problem.
-UNPLACED = frozenset({"invalid", "dead", "queued"})
+# An ID that reached the Registry as intended. `duplicate` counts: another friend having
+# already contributed it is the system working, not a problem. Everything else — every
+# wall AMC put up, every token we could not read — is a reason to exit non-zero, and
+# listing the good outcomes rather than the bad ones means a new failure mode cannot
+# quietly join the set that reports success.
+PLACED = frozenset({"new", "duplicate", "enriched"})
 
 
 def exit_code_for(outcomes):
     """Non-zero if any ID went unplaced — the only part of a report a script can read."""
-    return 1 if any(o.status in UNPLACED for o in outcomes) else 0
+    return 1 if any(o.status not in PLACED for o in outcomes) else 0
 
 
 def report(outcomes, out):
@@ -126,14 +130,20 @@ def contribute_command(given, enrich=False, db=None, session=None, out=None):
     outcomes = registry.contribute(db, given)
     report(outcomes, out)
     if enrich:
-        outcomes = outcomes + enrich_command(db=db, session=session, out=out)
+        # Only the IDs this person just handed us. The Registry is shared, so an
+        # unscoped pass here would spend one fetch on every pending row in it —
+        # hundreds, back to back, against the one endpoint the system depends on.
+        just_contributed = [o.showtime_id for o in outcomes if o.showtime_id is not None]
+        outcomes = outcomes + enrich_command(
+            db=db, session=session, out=out, showtime_ids=just_contributed
+        )
     return outcomes
 
 
-def enrich_command(db=None, session=None, out=None):
+def enrich_command(db=None, session=None, out=None, showtime_ids=None):
     """One enrichment pass over everything still owed a Seat Page fetch."""
     out = out or sys.stdout
-    outcomes = registry.enrich_pending(db, session=session)
+    outcomes = registry.enrich_pending(db, session=session, showtime_ids=showtime_ids)
     if not outcomes:
         # An operator who sees nothing must be able to tell "all caught up" from "broke".
         print("  nothing pending", file=out)
@@ -154,9 +164,12 @@ def registry_command(movie=None, theatre=None, format=None, db=None, out=None):
 
 def _describe(showtime):
     """One line about a Showtime, whether or not it has been enriched yet."""
+    # Death is checked first because it can strike long after Enrichment (CONTEXT.md), and
+    # a row still reading "enriched" would have someone watching a screening AMC pulled.
+    if showtime.dead_at is not None:
+        return f"{'dead':<10} {showtime.last_error or 'AMC says it does not exist'}"
     if showtime.enriched_at is None:
-        state = "dead" if showtime.dead_at else "pending"
-        return f"{state:<10} {showtime.last_error or 'awaiting its Seat Page'}"
+        return f"{'pending':<10} {showtime.last_error or 'awaiting its Seat Page'}"
     return (
         f"{'enriched':<10} {showtime.movie_name} — {showtime.format_name} "
         f"({showtime.format_code}) at {showtime.theatre_name}, "
@@ -214,6 +227,19 @@ def _with_db(db, run):
         engine.dispose()
 
 
+def safe_database_url():
+    """The configured database with its password masked.
+
+    Printed at the exact moment someone is about to paste our output into a bug report or
+    a chat, so the credentials must not be in it.
+    """
+    try:
+        return make_url(database_url()).render_as_string(hide_password=True)
+    except ArgumentError:
+        # An unparseable URL is itself the likely fault, but it may embed a password.
+        return "<unreadable DATABASE_URL>"
+
+
 def report_database_failure(error, out=None):
     """Say which database we could not use and what to do about it.
 
@@ -221,7 +247,7 @@ def report_database_failure(error, out=None):
     should get a remedy, not a driver stack trace. Returns a process exit code.
     """
     out = out or sys.stdout
-    print(f"FAIL: could not use the Registry database at {database_url()}", file=out)
+    print(f"FAIL: could not use the Registry database at {safe_database_url()}", file=out)
     print(
         "      Point DATABASE_URL at your Postgres and apply the schema with "
         "`alembic upgrade head`.",
@@ -229,6 +255,17 @@ def report_database_failure(error, out=None):
     )
     # The driver's own first line, which is where the actual cause lives.
     print(f"      {str(error).splitlines()[0]}", file=out)
+    return 1
+
+
+def report_database_error(error, out=None):
+    """A database error that is not about reachability — so no misleading remedy.
+
+    Telling someone to run `alembic upgrade head` because their showtime ID overflowed a
+    bigint sends them to fix the one thing that was never wrong.
+    """
+    out = out or sys.stdout
+    print(f"FAIL: the Registry rejected that: {str(error).splitlines()[0]}", file=out)
     return 1
 
 
@@ -258,10 +295,14 @@ def main(argv=None, session=None, db=None):
                 ),
             )
             return 0
-    except SQLAlchemyError as e:
+    except (OperationalError, ProgrammingError, ArgumentError) as e:
         # Unreachable, unmigrated, wrong credentials — all the same to the operator:
         # the Registry is not usable from here, and here is what to check.
         return report_database_failure(e)
+    except SQLAlchemyError as e:
+        # Reached the database fine; it disliked what we sent. Still no stack trace, but
+        # emphatically not the "check DATABASE_URL" advice either.
+        return report_database_error(e)
     return 2  # pragma: no cover - argparse rejects unknown commands first
 
 
