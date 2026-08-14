@@ -75,7 +75,7 @@ query TheatreShowtimes($slug: String!) {
                       status
                       auditorium
                       isReservedSeating
-                      format { edges { node { code name } } }
+                      format { attributes { code name } }
                       movie { name slug movieId }
                     }
                   }
@@ -97,7 +97,7 @@ _SEAT_QUERY = """
     showtime(id: $SHOWTIME_ID) {
       showtimeId
       showDateTimeUtc
-      format { edges { node { code name } } }
+      format { attributes { code name } }
       movie { movieId name }
       theatre { theatreId name }
       seatingLayout {

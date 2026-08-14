@@ -8,7 +8,12 @@
     "formats": {
      "items": [
       {
-       "attributes": [{"name": "IMAX 70MM", "code": "imax70mm"}],
+       "attributes": [
+        {
+         "name": "IMAX 70MM",
+         "code": "imax70mm"
+        }
+       ],
        "groups": {
         "edges": [
          {
@@ -20,10 +25,21 @@
                "showtimeId": 145377422,
                "showDateTimeUtc": "2026-08-15T17:00:00.000Z",
                "status": "Scheduled",
-               "auditorium": "House 15",
+               "auditorium": 15,
                "isReservedSeating": true,
-               "format": {"edges": [{"node": {"code": "imax70mm", "name": "IMAX 70MM"}}]},
-               "movie": {"name": "The Odyssey", "slug": "the-odyssey", "movieId": 76238}
+               "format": {
+                "attributes": [
+                 {
+                  "code": "imax70mm",
+                  "name": "IMAX 70MM"
+                 }
+                ]
+               },
+               "movie": {
+                "name": "The Odyssey",
+                "slug": "the-odyssey",
+                "movieId": 76238
+               }
               }
              }
             ]
@@ -39,10 +55,21 @@
                "showtimeId": 145377423,
                "showDateTimeUtc": "2026-08-16T17:00:00.000Z",
                "status": "Scheduled",
-               "auditorium": "House 15",
+               "auditorium": 15,
                "isReservedSeating": true,
-               "format": {"edges": [{"node": {"code": "imax70mm", "name": "IMAX 70MM"}}]},
-               "movie": {"name": "The Odyssey", "slug": "the-odyssey", "movieId": 76238}
+               "format": {
+                "attributes": [
+                 {
+                  "code": "imax70mm",
+                  "name": "IMAX 70MM"
+                 }
+                ]
+               },
+               "movie": {
+                "name": "The Odyssey",
+                "slug": "the-odyssey",
+                "movieId": 76238
+               }
               }
              }
             ]
@@ -53,7 +80,12 @@
        }
       },
       {
-       "attributes": [{"name": "IMAX", "code": "imax"}],
+       "attributes": [
+        {
+         "name": "IMAX",
+         "code": "imax"
+        }
+       ],
        "groups": {
         "edges": [
          {
@@ -65,10 +97,21 @@
                "showtimeId": 145377422,
                "showDateTimeUtc": "2026-08-15T17:00:00.000Z",
                "status": "Scheduled",
-               "auditorium": "House 15",
+               "auditorium": 15,
                "isReservedSeating": true,
-               "format": {"edges": [{"node": {"code": "imax70mm", "name": "IMAX 70MM"}}]},
-               "movie": {"name": "The Odyssey", "slug": "the-odyssey", "movieId": 76238}
+               "format": {
+                "attributes": [
+                 {
+                  "code": "imax70mm",
+                  "name": "IMAX 70MM"
+                 }
+                ]
+               },
+               "movie": {
+                "name": "The Odyssey",
+                "slug": "the-odyssey",
+                "movieId": 76238
+               }
               }
              }
             ]
@@ -79,7 +122,12 @@
        }
       },
       {
-       "attributes": [{"name": "InfinityVision", "code": "infinityvision"}],
+       "attributes": [
+        {
+         "name": "InfinityVision",
+         "code": "infinityvision"
+        }
+       ],
        "groups": {
         "edges": [
          {
@@ -91,10 +139,21 @@
                "showtimeId": 145901234,
                "showDateTimeUtc": "2026-12-18T03:00:00.000Z",
                "status": "OnSale",
-               "auditorium": "House 6",
+               "auditorium": 6,
                "isReservedSeating": true,
-               "format": {"edges": [{"node": {"code": "infinityvision", "name": "InfinityVision"}}]},
-               "movie": {"name": "Avengers: Doomsday", "slug": "avengers-doomsday", "movieId": 78500}
+               "format": {
+                "attributes": [
+                 {
+                  "code": "infinityvision",
+                  "name": "InfinityVision"
+                 }
+                ]
+               },
+               "movie": {
+                "name": "Avengers: Doomsday",
+                "slug": "avengers-doomsday",
+                "movieId": 78500
+               }
               }
              }
             ]

@@ -77,21 +77,28 @@ def _classify(response, showtime_id):
         raise AccessBlocked("403 refused at the GraphQL host", showtime_id)
     if response.status_code == 429:
         raise RateLimited("HTTP 429 from the GraphQL host — asking too often", showtime_id)
-    if not response.ok:
-        raise FetchUnavailable(
-            f"HTTP {response.status_code} from the GraphQL host", showtime_id
-        )
     try:
         payload = response.json()
     except ValueError as e:
+        if not response.ok:
+            raise FetchUnavailable(
+                f"HTTP {response.status_code} from the GraphQL host", showtime_id
+            ) from e
         raise ShapeChanged(
             "graphql: response is not JSON (a challenge or interstitial page?)",
             showtime_id,
         ) from e
     errors = payload.get("errors") if isinstance(payload, dict) else None
     if errors:
+        # GraphQL servers ride validation errors on an HTTP 400 (observed live
+        # 2026-08-14) — either way it means our query no longer fits the schema, and
+        # the operator gets AMC's words, not a mute status code.
         said = "; ".join(str(e.get("message", e)) for e in errors[:3])
         raise ShapeChanged(f"graphql: server rejected the query: {said}", showtime_id)
+    if not response.ok:
+        raise FetchUnavailable(
+            f"HTTP {response.status_code} from the GraphQL host", showtime_id
+        )
     return payload
 
 

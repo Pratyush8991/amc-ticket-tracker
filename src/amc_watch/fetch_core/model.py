@@ -82,7 +82,7 @@ class DiscoveredShowtime:
     format_code: str
     format_name: str
     starts_at_utc: datetime
-    auditorium: str
+    auditorium: int | None  # AMC types it a bare Int (introspected 2026-08-14)
     status: str
     is_reserved_seating: bool
 

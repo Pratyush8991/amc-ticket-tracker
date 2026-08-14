@@ -5,12 +5,10 @@
     "showtimeId": 144696966,
     "showDateTimeUtc": "2026-08-09T17:00:00.000Z",
     "format": {
-     "edges": [
+     "attributes": [
       {
-       "node": {
-        "code": "imax70mm",
-        "name": "IMAX 70MM"
-       }
+       "code": "imax70mm",
+       "name": "IMAX 70MM"
       }
      ]
     },

@@ -65,7 +65,7 @@ def test_discovery_returns_pre_enriched_showtimes_with_no_second_fetch():
     assert odyssey.movie_slug == "the-odyssey"
     assert (odyssey.format_code, odyssey.format_name) == ("imax70mm", "IMAX 70MM")
     assert odyssey.starts_at_utc == datetime(2026, 8, 15, 17, 0, tzinfo=timezone.utc)
-    assert odyssey.auditorium == "House 15"
+    assert odyssey.auditorium == 15  # AMC types auditorium as a bare Int
     assert odyssey.is_reserved_seating is True
     assert (odyssey.theatre_id, odyssey.theatre_slug, odyssey.theatre_name) == (
         2325,
@@ -195,6 +195,22 @@ def test_graphql_level_errors_are_loud_and_carry_amcs_words():
     with pytest.raises(ShapeChanged) as e:
         discover_showtimes(METREON, business_date=SATURDAY, session=session)
     assert "Cannot query field 'showtimes'" in str(e.value)
+
+
+def test_a_400_carrying_graphql_errors_quotes_amc_not_just_the_status():
+    """GraphQL servers put validation errors in the body of a 400 — observed live
+    2026-08-14, where the bare status hid "Cannot query field ...". The operator
+    must get AMC's words, and a schema rejection is a shape change, not downtime."""
+    session = FakeGraphQLSession(
+        lambda posted: FakeGraphQLResponse(
+            status_code=400,
+            payload={"errors": [{"message": 'Cannot query field "edges" on type "X"'}]},
+        )
+    )
+
+    with pytest.raises(ShapeChanged) as e:
+        discover_showtimes(METREON, business_date=SATURDAY, session=session)
+    assert 'Cannot query field "edges"' in str(e.value)
 
 
 def test_a_null_showtime_is_a_dead_id_not_a_shape_change():

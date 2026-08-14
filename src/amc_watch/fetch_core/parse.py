@@ -116,6 +116,22 @@ def _first_edge_node(obj, key):
     return (edges[0].get("node") or {}) if edges else {}
 
 
+def _format_of(obj):
+    """A showtime object's Format node — {code, name}.
+
+    The same idea arrives in two shapes: the RSC payload embeds `format` as a Relay
+    connection (edges/node), while the live GraphQL schema types it as
+    ShowtimeMovieFormat with a plain `attributes` list (introspected 2026-08-14).
+    First entry of whichever shape arrived; missing → {} and the caller's
+    required-field check reports it.
+    """
+    container = obj.get("format") or {}
+    if "edges" in container:
+        return _first_edge_node(obj, "format")
+    attributes = container.get("attributes") or []
+    return attributes[0] if attributes else {}
+
+
 def parse_starts_at(raw, what):
     """AMC's `showDateTimeUtc` ISO string → an aware datetime, or ShapeChanged."""
     try:
@@ -140,7 +156,7 @@ def showtime_fields(obj):
     (the Next.js server ran that query for us), so this extraction is shared by both
     backends — one definition of what a SeatPage needs.
     """
-    fmt = _first_edge_node(obj, "format")
+    fmt = _format_of(obj)
     movie = obj.get("movie") or {}
     theatre = obj.get("theatre") or {}
     starts_at_utc = parse_starts_at(obj.get("showDateTimeUtc"), "showtime metadata")

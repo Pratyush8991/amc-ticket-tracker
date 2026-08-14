@@ -8,7 +8,7 @@ SeatPage metadata extraction are literally shared with the RSC side (`parse_seat
 
 from ..errors import ShapeChanged, ShowtimeNotFound, TheatreNotFound
 from ..model import DiscoveredShowtime, SeatPage, Theatre
-from ..parse import _first_edge_node, parse_seats, parse_starts_at, showtime_fields
+from ..parse import _format_of, parse_seats, parse_starts_at, showtime_fields
 
 
 def _viewer(payload, what):
@@ -80,7 +80,7 @@ def parse_discovery(payload, theatre_slug):
 
 
 def _discovered_row(node, theatre, theatre_slug):
-    fmt = _first_edge_node(node, "format")
+    fmt = _format_of(node)
     movie = node.get("movie") or {}
     missing = [
         k
@@ -104,7 +104,7 @@ def _discovered_row(node, theatre, theatre_slug):
         format_code=fmt["code"],
         format_name=fmt.get("name") or "",
         starts_at_utc=parse_starts_at(node.get("showDateTimeUtc"), "graphql discovery"),
-        auditorium=str(node.get("auditorium") or ""),
+        auditorium=int(node["auditorium"]) if node.get("auditorium") is not None else None,
         status=str(node.get("status") or ""),
         is_reserved_seating=bool(node.get("isReservedSeating")),
     )
