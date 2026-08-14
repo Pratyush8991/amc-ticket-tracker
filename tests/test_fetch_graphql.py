@@ -226,3 +226,18 @@ def test_a_graphql_transport_failure_is_reported_as_unavailable():
 
     with pytest.raises(FetchUnavailable):
         discover_showtimes(METREON, business_date=SATURDAY, session=FakeGraphQLSession(boom))
+
+
+def test_the_graphql_post_presents_itself_as_the_browser_would():
+    """The browser's ordinary cross-origin headers — cookies + Origin/Referer, never a
+    vendor key or custom header — are what authorize the call (ADR-0005)."""
+    session = graphql_serving("metreon_imax70mm_seats")
+    fetch_seat_page_graphql(144696966, session=session)
+    [sent] = session.posts
+
+    assert sent["url"] == "https://graph.amctheatres.com/"
+    assert sent["headers"]["Origin"] == "https://www.amctheatres.com"
+    assert sent["headers"]["Accept"] == "application/json"
+    assert "X-AMC-Vendor-Key" not in sent["headers"]
+    assert sent["timeout"] == 25
+    assert "seatingLayout" in sent["json"]["query"]
