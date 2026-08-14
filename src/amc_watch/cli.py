@@ -26,7 +26,11 @@ from .fetch_core import (
 # A Seat Page known to exist. Showtimes pass, so this rots by design — hence
 # --showtime-id and AMC_SMOKE_TEST_SHOWTIME_ID. A ShowtimeNotFound from the default is a
 # stale constant, not a blocked box, and the failure text says so.
-DEFAULT_SHOWTIME_ID = "144696969"
+#
+# Note the ID waves are not contiguous with each other: Aug 9 was 1446969xx and Aug 15 is
+# 1453774xx. Do not try to guess a fresh ID by probing outward from a stale one — that is
+# the range-probing ADR-0001 rejected, and it would not even work.
+DEFAULT_SHOWTIME_ID = "145377422"  # The Odyssey, IMAX 70mm, Metreon 16, Sat 2026-08-15
 
 REMEDIES = {
     QueueWalled: (

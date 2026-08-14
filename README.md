@@ -72,15 +72,21 @@ uv run amc-watch smoke-test
 ```
 
 ```
-GET https://www.amctheatres.com/showtimes/144696969/seats
-PASS: The Odyssey - IMAX 70MM (imax70mm) at AMC Metreon 16, 2026-08-09 17:00 UTC
+GET https://www.amctheatres.com/showtimes/145377422/seats
+PASS: The Odyssey - IMAX 70MM (imax70mm) at AMC Metreon 16, 2026-08-15 17:00 UTC
       437 seats in the layout, 1 bookable right now
 ```
 
 A `FAIL` tells you which wall you hit and what to do about it — a queue redirect, a 403,
 a 429, a dead showtime ID, or a changed page shape are all reported distinctly, because
-"AMC blocked us" and "no seats are open" must never look alike. Showtimes pass, so the
-default ID rots; override it with `--showtime-id <id>`.
+"AMC blocked us" and "no seats are open" must never look alike.
+
+Showtimes pass, so the built-in default rots within days; override it with
+`--showtime-id <id>` or `AMC_SMOKE_TEST_SHOWTIME_ID`. Getting a current ID means opening
+a showtime through to its seat map yourself and copying the number out of the URL —
+listings are queue-walled, and guessing IDs by probing near a known one is the range
+probing ADR-0001 rejected. ID waves are not contiguous anyway (Aug 9 was `1446969xx`,
+Aug 15 `1453774xx`), so probing would fail *and* spend bot-detection risk.
 
 ## Tests
 
