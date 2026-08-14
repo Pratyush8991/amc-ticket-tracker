@@ -56,3 +56,11 @@ class Showtime(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     enriched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # A showtime AMC says does not exist. Set once and never retried: a 404 is permanent,
+    # and Polling Budget spent rediscovering a typo is budget stolen from a real Watch.
+    dead_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Why the last enrichment attempt failed, kept so the reason outlives the command that
+    # produced it — an operator reading the Registry later must not find silence.
+    last_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
