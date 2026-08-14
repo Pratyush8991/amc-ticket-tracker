@@ -22,23 +22,30 @@ class Showtime(Base):
     The primary key is AMC's own showtime ID, which is what makes Contribution
     idempotent: several friends harvesting the same AMC page is a no-op collision rather
     than a duplicate row.
+
+    A Contribution stores the bare ID alone, so a row exists before anything is known
+    about it: every enrichment column below is null until the enrichment pass fetches the
+    Seat Page. `enriched_at` is the marker — null means "still pending", and nothing may
+    infer pending-ness from a null movie name instead.
     """
 
     __tablename__ = "showtimes"
 
     showtime_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
 
-    movie_id: Mapped[int] = mapped_column(Integer, index=True)
-    movie_name: Mapped[str] = mapped_column(String(300))
-    theatre_id: Mapped[int] = mapped_column(Integer, index=True)
-    theatre_name: Mapped[str] = mapped_column(String(300))
+    movie_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
+    movie_name: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    theatre_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
+    theatre_name: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
     # Read from the Seat Page, never hardcoded — InfinityVision's code is unknown until
     # the first Doomsday Contribution lands.
-    format_code: Mapped[str] = mapped_column(String(100), index=True)
-    format_name: Mapped[str] = mapped_column(String(200))
+    format_code: Mapped[str | None] = mapped_column(String(100), index=True, nullable=True)
+    format_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
-    starts_at_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    starts_at_utc: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True, nullable=True
+    )
 
     # The full seat grid as last fetched. Kept so the visual seat picker can render a
     # real auditorium the moment any showtime for that house is in the Registry, without
