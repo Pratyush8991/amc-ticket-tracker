@@ -11,14 +11,31 @@ import json
 from datetime import date, datetime, timezone
 from urllib.parse import quote, unquote
 
+import pytest
+
 from amc_watch.fetch_core import (
+    AccessBlocked,
+    FetchUnavailable,
+    QueueWalled,
+    RateLimited,
+    ShapeChanged,
+    ShowtimeNotFound,
+    TheatreNotFound,
     discover_showtimes,
     enumerate_theatres,
     fetch_seat_page,
     fetch_seat_page_graphql,
 )
 
-from .conftest import graphql_paging, graphql_serving, serving
+from .conftest import (
+    QUEUE_URL,
+    FakeGraphQLResponse,
+    FakeGraphQLSession,
+    graphql_paging,
+    graphql_responding,
+    graphql_serving,
+    serving,
+)
 
 METREON = "amc-metreon-16"
 SATURDAY = date(2026, 8, 15)
@@ -132,3 +149,80 @@ def test_a_theatre_with_no_showtimes_is_an_answer_not_a_failure():
     )
 
     assert rows == ()
+
+
+@pytest.mark.parametrize(
+    "status,expected",
+    [
+        (403, AccessBlocked),
+        (429, RateLimited),
+        (500, FetchUnavailable),
+    ],
+)
+def test_graphql_http_failures_surface_as_distinct_errors(status, expected):
+    """A blocked box, an overspent Polling Budget and a flaky host each need their own
+    operator remedy — on this surface exactly as on the RSC one."""
+    with pytest.raises(expected):
+        fetch_seat_page_graphql(145377422, session=graphql_responding(status_code=status))
+
+
+def test_a_queue_redirect_on_the_graphql_host_is_named_for_what_it_is():
+    """The graph host is not queue-walled today (ADR-0005) — if AMC ever claps it
+    behind Queue-it, that must surface by name, not as a mystery parse failure."""
+    session = graphql_responding(text="<html>waiting room</html>", url=QUEUE_URL)
+
+    with pytest.raises(QueueWalled):
+        discover_showtimes(METREON, business_date=SATURDAY, session=session)
+
+
+def test_a_non_json_answer_is_a_shape_change():
+    """A challenge interstitial answering 200 must never read as an empty discovery."""
+    session = graphql_responding(text="<html>prove you are human</html>")
+
+    with pytest.raises(ShapeChanged):
+        discover_showtimes(METREON, business_date=SATURDAY, session=session)
+
+
+def test_graphql_level_errors_are_loud_and_carry_amcs_words():
+    """A top-level `errors` array means the query no longer fits the schema — the
+    loudest failure, and the message should quote AMC so the operator can read it."""
+    session = FakeGraphQLSession(
+        lambda posted: FakeGraphQLResponse(
+            payload={"errors": [{"message": "Cannot query field 'showtimes'"}]}
+        )
+    )
+
+    with pytest.raises(ShapeChanged) as e:
+        discover_showtimes(METREON, business_date=SATURDAY, session=session)
+    assert "Cannot query field 'showtimes'" in str(e.value)
+
+
+def test_a_null_showtime_is_a_dead_id_not_a_shape_change():
+    """GraphQL answering `showtime: null` is AMC saying "no such showtime" — the
+    404-equivalent, distinct from the payload changing shape."""
+    session = FakeGraphQLSession(
+        lambda posted: FakeGraphQLResponse(payload={"data": {"viewer": {"showtime": None}}})
+    )
+
+    with pytest.raises(ShowtimeNotFound) as e:
+        fetch_seat_page_graphql(999999999, session=session)
+    assert e.value.showtime_id == 999999999
+
+
+def test_a_null_theatre_is_a_dead_slug_not_a_quiet_day():
+    """A wrong slug is stale config an operator must hear about; it must never look
+    like a theatre with nothing scheduled."""
+    session = FakeGraphQLSession(
+        lambda posted: FakeGraphQLResponse(payload={"data": {"viewer": {"theatre": None}}})
+    )
+
+    with pytest.raises(TheatreNotFound):
+        discover_showtimes("amc-nowhere-0", business_date=SATURDAY, session=session)
+
+
+def test_a_graphql_transport_failure_is_reported_as_unavailable():
+    def boom(posted):
+        raise ConnectionError("connection reset")
+
+    with pytest.raises(FetchUnavailable):
+        discover_showtimes(METREON, business_date=SATURDAY, session=FakeGraphQLSession(boom))

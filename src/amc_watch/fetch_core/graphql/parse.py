@@ -6,7 +6,7 @@ SeatPage metadata extraction are literally shared with the RSC side (`parse_seat
 `showtime_fields`), so both backends stay one value object by construction.
 """
 
-from ..errors import ShapeChanged
+from ..errors import ShapeChanged, ShowtimeNotFound, TheatreNotFound
 from ..model import DiscoveredShowtime, SeatPage, Theatre
 from ..parse import _first_edge_node, parse_seats, parse_starts_at, showtime_fields
 
@@ -59,8 +59,11 @@ def parse_discovery(payload, theatre_slug):
     with nothing scheduled that day — never an exception.
     """
     theatre = _viewer(payload, "graphql discovery").get("theatre")
+    if theatre is None:
+        # AMC answered: nothing lives at this slug. Stale config, not a quiet day.
+        raise TheatreNotFound(f"GraphQL says there is no theatre at slug {theatre_slug!r}")
     if not isinstance(theatre, dict):
-        raise ShapeChanged(f"graphql discovery: no theatre in response for {theatre_slug!r}")
+        raise ShapeChanged(f"graphql discovery: no theatre object in response for {theatre_slug!r}")
     if theatre.get("theatreId") is None:
         raise ShapeChanged("graphql discovery: theatre has no theatreId")
 
@@ -110,8 +113,11 @@ def _discovered_row(node, theatre, theatre_slug):
 def parse_seat_response(payload, showtime_id):
     """Reduce a seat-query response to a SeatPage."""
     node = _viewer(payload, "graphql seat read").get("showtime")
+    if node is None:
+        # The GraphQL analogue of the Seat Page's 404: a dead or never-real ID.
+        raise ShowtimeNotFound("GraphQL says there is no such showtime", showtime_id)
     if not isinstance(node, dict):
-        raise ShapeChanged("graphql seat read: response has no showtime", showtime_id)
+        raise ShapeChanged("graphql seat read: response has no showtime object", showtime_id)
     layout = node.get("seatingLayout")
     if not isinstance(layout, dict) or "seats" not in layout:
         raise ShapeChanged("graphql seat read: showtime has no seatingLayout", showtime_id)

@@ -14,8 +14,15 @@ import json
 from datetime import date
 from urllib.parse import quote, unquote
 
-from ..client import DEFAULT_TIMEOUT
-from ..errors import ShapeChanged
+from ..client import DEFAULT_TIMEOUT, QUEUE_HOST
+from ..errors import (
+    AccessBlocked,
+    FetchError,
+    FetchUnavailable,
+    QueueWalled,
+    RateLimited,
+    ShapeChanged,
+)
 from .parse import parse_discovery, parse_seat_response, parse_theatre_page
 from .queries import DISCOVERY_QUERY, THEATRES_QUERY, seat_query
 
@@ -44,14 +51,48 @@ def open_graphql_session():
     return session
 
 
-def _graphql(session, query, timeout, variables=None):
-    response = session.post(
-        GRAPHQL_URL,
-        json={"query": query, "variables": variables or {}},
-        headers=GRAPHQL_HEADERS,
-        timeout=timeout,
-    )
-    return response.json()
+def _graphql(session, query, timeout, variables=None, showtime_id=None):
+    """POST one query and classify the answer, mirroring the RSC client's contract:
+    the return value is a trustworthy GraphQL payload, everything else raises."""
+    try:
+        response = session.post(
+            GRAPHQL_URL,
+            json={"query": query, "variables": variables or {}},
+            headers=GRAPHQL_HEADERS,
+            timeout=timeout,
+        )
+    except FetchError:
+        raise
+    except Exception as e:  # curl_cffi's exception tree — the one narrow broad-catch
+        raise FetchUnavailable(f"graphql request failed: {e}", showtime_id) from e
+    return _classify(response, showtime_id)
+
+
+def _classify(response, showtime_id):
+    if QUEUE_HOST in (response.url or ""):
+        raise QueueWalled(
+            "the GraphQL host redirected into the Queue-it waiting room", showtime_id
+        )
+    if response.status_code == 403:
+        raise AccessBlocked("403 refused at the GraphQL host", showtime_id)
+    if response.status_code == 429:
+        raise RateLimited("HTTP 429 from the GraphQL host — asking too often", showtime_id)
+    if not response.ok:
+        raise FetchUnavailable(
+            f"HTTP {response.status_code} from the GraphQL host", showtime_id
+        )
+    try:
+        payload = response.json()
+    except ValueError as e:
+        raise ShapeChanged(
+            "graphql: response is not JSON (a challenge or interstitial page?)",
+            showtime_id,
+        ) from e
+    errors = payload.get("errors") if isinstance(payload, dict) else None
+    if errors:
+        said = "; ".join(str(e.get("message", e)) for e in errors[:3])
+        raise ShapeChanged(f"graphql: server rejected the query: {said}", showtime_id)
+    return payload
 
 
 def enumerate_theatres(
@@ -154,7 +195,9 @@ def fetch_seat_page_graphql(showtime_id, session=None, timeout=DEFAULT_TIMEOUT):
     owned = session is None
     session = session or open_graphql_session()
     try:
-        payload = _graphql(session, seat_query(showtime_id), timeout)
+        payload = _graphql(
+            session, seat_query(showtime_id), timeout, showtime_id=showtime_id
+        )
         return parse_seat_response(payload, showtime_id)
     finally:
         if owned:
