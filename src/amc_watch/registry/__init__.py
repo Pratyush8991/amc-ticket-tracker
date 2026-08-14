@@ -168,6 +168,21 @@ def _layout_of(page):
     }
 
 
-def list_showtimes(db):
-    """The Registry as a user browses it."""
-    return db.scalars(select(Showtime).order_by(Showtime.showtime_id)).all()
+def list_showtimes(db, movie=None, theatre=None, format=None):
+    """The Registry as a user browses it, narrowed the way a Watch selector narrows.
+
+    Filters are case-insensitive substrings so that "doomsday" finds Avengers Doomsday and
+    "metreon" finds AMC Metreon 16 — nobody should have to retype AMC's exact title. A
+    format matches on either its code or its printed name, since users know it as
+    "IMAX 70MM" while the Seat Page calls it `imax70mm`.
+    """
+    query = select(Showtime).order_by(Showtime.showtime_id)
+    if movie:
+        query = query.where(Showtime.movie_name.ilike(f"%{movie}%"))
+    if theatre:
+        query = query.where(Showtime.theatre_name.ilike(f"%{theatre}%"))
+    if format:
+        query = query.where(
+            Showtime.format_code.ilike(f"%{format}%") | Showtime.format_name.ilike(f"%{format}%")
+        )
+    return db.scalars(query).all()

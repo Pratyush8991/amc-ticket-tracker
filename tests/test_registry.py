@@ -10,7 +10,21 @@ from datetime import datetime, timezone
 
 from amc_watch.registry import contribute, enrich_pending, list_showtimes
 
-from .conftest import QUEUE_URL, FakeResponse, FakeSession, Redirect, responding, serving
+from .conftest import (
+    QUEUE_URL,
+    FakeResponse,
+    FakeSession,
+    Redirect,
+    responding,
+    serving,
+    serving_each,
+)
+
+# Two Showtimes that differ in every way a Watch selector cares about.
+TWO_HOUSES = {
+    144696966: "metreon_imax70mm_as_recorded",  # The Odyssey, IMAX 70MM, Metreon 16
+    145377422: "kabuki_unrecordedformat_edited",  # Avengers Doomsday, Kabuki 8
+}
 
 
 def test_a_contributed_bare_id_fills_itself_in_from_its_seat_page(db_session, as_recorded):
@@ -113,3 +127,18 @@ def test_a_format_nobody_has_recorded_yet_is_stored_exactly_as_reported(db_sessi
     (showtime,) = list_showtimes(db_session)
     assert showtime.format_code == "formatnobodyhasrecordedyet"
     assert showtime.format_name == "Format Nobody Has Recorded Yet"
+
+
+def test_the_registry_is_filterable_by_movie_theatre_and_format(db_session):
+    """The three axes a Watch selector matches on, so a user can see what is covered."""
+    contribute(db_session, [str(i) for i in TWO_HOUSES])
+    enrich_pending(db_session, session=serving_each(TWO_HOUSES))
+
+    def ids(**filters):
+        return [s.showtime_id for s in list_showtimes(db_session, **filters)]
+
+    assert ids() == [144696966, 145377422]
+    assert ids(movie="doomsday") == [145377422]
+    assert ids(theatre="metreon") == [144696966]
+    assert ids(format="imax70mm") == [144696966]
+    assert ids(movie="doomsday", theatre="metreon") == []

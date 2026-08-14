@@ -50,7 +50,7 @@ The rebuild is landing in slices, tracked in GitHub issues. What exists today:
 | `fetch_core` — Seat Page GET + RSC parse, error taxonomy | working |
 | `amc-watch smoke-test` — the first act on any new box | working |
 | Test harness — ephemeral Postgres, Alembic baseline, recorded fixtures | working |
-| `registry` — contribution + enrichment | skeleton (#3) |
+| `registry` — contribution + enrichment, driven from the CLI | working |
 | `watching` — selectors, lifecycle, Opening computation | skeleton (#4, #6) |
 | `alerting` — ntfy Channel, dedup ledger | skeleton (#4) |
 | `web` — invites, watch management, seat picker, bookmarklet | skeleton (#8–#12) |
@@ -80,6 +80,43 @@ PASS: The Odyssey - IMAX 70MM (imax70mm) at AMC Metreon 16, 2026-08-15 17:00 UTC
 A `FAIL` tells you which wall you hit and what to do about it — a queue redirect, a 403,
 a 429, a dead showtime ID, or a changed page shape are all reported distinctly, because
 "AMC blocked us" and "no seats are open" must never look alike.
+
+### Filling the Registry
+
+Showtime IDs enter the system by hand, because AMC's listings are queue-walled and you
+are the one who can walk through the queue. Paste bare IDs, full seat-page URLs, or a mix:
+
+```bash
+export DATABASE_URL=postgresql+psycopg://localhost/amc_watch
+uv run alembic upgrade head
+
+uv run amc-watch contribute 144696966 https://www.amctheatres.com/showtimes/145377422/seats
+uv run amc-watch enrich
+```
+
+`contribute` never touches the network — it just records the IDs. `enrich` is the pass
+that spends one Seat Page fetch per row and fills in everything else, which is why no
+human ever types a movie name or a format:
+
+```
+  144696966    enriched   The Odyssey — IMAX 70MM (imax70mm) at AMC Metreon 16, 2026-08-09 17:00 UTC
+```
+
+Use `contribute --enrich` to do both at once. Every ID you hand it gets a line back —
+`new`, `duplicate`, `invalid`, `dead` (AMC 404s: recorded once and never re-fetched) or
+`queued` (a wall we should retry) — and anything unplaced makes the command exit non-zero,
+so a typo can't disappear. Then browse what's covered:
+
+```bash
+uv run amc-watch registry --movie doomsday --theatre metreon
+```
+
+Filters are case-insensitive substrings over the three axes a Watch selects on: movie,
+theatre and format. Format codes are stored exactly as the Seat Page reports them and are
+never mapped or hardcoded — InfinityVision's real code is simply unknown here until the
+first Doomsday contribution reveals it.
+
+### Notes on the smoke test
 
 Showtimes pass, so the built-in default rots within days; override it with
 `--showtime-id <id>` or `AMC_SMOKE_TEST_SHOWTIME_ID`. Getting a current ID means opening

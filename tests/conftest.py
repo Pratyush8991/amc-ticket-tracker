@@ -68,6 +68,23 @@ def serving(fixture_name):
     return FakeSession(lambda url: FakeResponse(text=body, url=url))
 
 
+def serving_each(by_showtime_id):
+    """A session that answers each showtime with its own recorded payload.
+
+    What a Registry holding several Showtimes actually looks like from the fetch edge:
+    ask for an ID nobody recorded and AMC 404s, exactly as it would for a typo.
+    """
+    bodies = {str(k): load_rsc(v) for k, v in by_showtime_id.items()}
+
+    def handler(url):
+        for showtime_id, body in bodies.items():
+            if f"/showtimes/{showtime_id}/" in url:
+                return FakeResponse(text=body, url=url)
+        return FakeResponse(status_code=404, url=url)
+
+    return FakeSession(handler)
+
+
 def responding(**kwargs):
     """A session that answers every request with one canned response."""
     return FakeSession(lambda url: FakeResponse(url=url, **kwargs))
