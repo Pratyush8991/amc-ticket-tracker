@@ -16,8 +16,10 @@ import argparse
 import os
 import sys
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from . import registry
-from .db import create_engine_from_env, session_factory
+from .db import create_engine_from_env, database_url, session_factory
 from .fetch_core import (
     AccessBlocked,
     QueueWalled,
@@ -212,29 +214,54 @@ def _with_db(db, run):
         engine.dispose()
 
 
+def report_database_failure(error, out=None):
+    """Say which database we could not use and what to do about it.
+
+    The same courtesy the smoke test extends to a blocked box: someone who just SSH'd in
+    should get a remedy, not a driver stack trace. Returns a process exit code.
+    """
+    out = out or sys.stdout
+    print(f"FAIL: could not use the Registry database at {database_url()}", file=out)
+    print(
+        "      Point DATABASE_URL at your Postgres and apply the schema with "
+        "`alembic upgrade head`.",
+        file=out,
+    )
+    # The driver's own first line, which is where the actual cause lives.
+    print(f"      {str(error).splitlines()[0]}", file=out)
+    return 1
+
+
 def main(argv=None, session=None, db=None):
     args = build_parser().parse_args(argv)
     if args.command == "smoke-test":
         return smoke_test(args.showtime_id or default_showtime_id(), session=session)
-    if args.command == "contribute":
-        return exit_code_for(
+    try:
+        if args.command == "contribute":
+            return exit_code_for(
+                _with_db(
+                    db,
+                    lambda opened: contribute_command(
+                        args.given, enrich=args.enrich, db=opened, session=session
+                    ),
+                )
+            )
+        if args.command == "enrich":
+            return exit_code_for(
+                _with_db(db, lambda opened: enrich_command(db=opened, session=session))
+            )
+        if args.command == "registry":
             _with_db(
                 db,
-                lambda opened: contribute_command(
-                    args.given, enrich=args.enrich, db=opened, session=session
+                lambda opened: registry_command(
+                    movie=args.movie, theatre=args.theatre, format=args.format, db=opened
                 ),
             )
-        )
-    if args.command == "enrich":
-        return exit_code_for(_with_db(db, lambda opened: enrich_command(db=opened, session=session)))
-    if args.command == "registry":
-        _with_db(
-            db,
-            lambda opened: registry_command(
-                movie=args.movie, theatre=args.theatre, format=args.format, db=opened
-            ),
-        )
-        return 0
+            return 0
+    except SQLAlchemyError as e:
+        # Unreachable, unmigrated, wrong credentials — all the same to the operator:
+        # the Registry is not usable from here, and here is what to check.
+        return report_database_failure(e)
     return 2  # pragma: no cover - argparse rejects unknown commands first
 
 

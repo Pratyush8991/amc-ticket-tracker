@@ -10,12 +10,23 @@ theatre, format, date/time, and the full seat layout. Open to plain HTTP; everyt
 on amctheatres.com is queue-walled.
 
 **Showtime** — one screening (movie × theatre × auditorium × date/time × format),
-identified by AMC's numeric showtime ID. Enriched automatically from its Seat Page;
-no human ever supplies showtime metadata.
+identified by AMC's numeric showtime ID. Described entirely by Enrichment; no human ever
+supplies showtime metadata. A Showtime is **pending** from the moment it is contributed
+until a Seat Page describes it, **enriched** once one has, and **dead** when AMC denies
+the ID exists — a typo, or a screening AMC pulled, which the system cannot tell apart and
+does not need to. Death is terminal and can strike at any point in a Showtime's life,
+including long after Enrichment, but how much denial it takes depends on what AMC has
+already told us: a pending Showtime dies the first time AMC disowns it, while an enriched
+one was demonstrably real once and must be disowned repeatedly before we believe it.
+Death is not a Watch **expiring** — expiry is time passing, death is AMC saying no. Only
+enriched Showtimes are covered by Watches or polled: a pending one has no movie, theatre
+or format to match a selector against, and a dead one has nothing left to watch.
 
 **Registry** — the shared pool of known Showtimes. Grows only by Contribution; AMC's
 listings cannot be scraped (Queue-it waiting room). Shared across all users: once any
-user contributes a showtime, every matching Watch covers it.
+user contributes a showtime, every matching Watch covers it. It remembers dead Showtimes
+as well as live ones, so a typo is asked about once rather than every time somebody
+re-contributes it.
 
 **Contribution** — the act of submitting bare showtime IDs to the Registry, either by
 pasting or via the Bookmarklet. The only manual step in the whole system.
@@ -23,6 +34,13 @@ pasting or via the Bookmarklet. The only manual step in the whole system.
 **Bookmarklet** — a browser helper that harvests every showtime ID from whatever AMC page
 a user legitimately has open (they pass the queue as a human) and submits them as a
 Contribution in one tap.
+
+**Enrichment** — describing a contributed Showtime from its Seat Page: movie, theatre,
+format, start time and layout, read off the page and stored exactly as reported. The
+counterpart to Contribution — a human supplies the ID, Enrichment supplies everything
+else — and the first Polling Budget a Showtime ever costs. It either describes the
+Showtime, leaves it pending because AMC never gave a trustworthy answer (a wall is not a
+verdict), or finds it dead.
 
 **Format** — AMC's presentation format for a showtime (e.g. `imax70mm`, Dolby Cinema,
 InfinityVision), as reported by the Seat Page. A format implies an auditorium in practice,

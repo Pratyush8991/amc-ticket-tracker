@@ -101,6 +101,19 @@ def test_the_registry_shows_rows_that_are_still_waiting_to_be_enriched(db_sessio
     assert "pending" in out
 
 
+def test_an_unreachable_database_is_reported_the_way_a_blocked_box_is(capsys, monkeypatch):
+    """An operator who just SSH'd in gets a remedy, not a SQLAlchemy stack trace."""
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://localhost:1/nowhere")
+
+    exit_code = main(["contribute", CONTRIBUTED])
+
+    assert exit_code != 0
+    out = capsys.readouterr().out
+    assert "FAIL" in out
+    assert "DATABASE_URL" in out
+    assert "Traceback" not in out
+
+
 def test_a_typo_makes_contribute_exit_non_zero_without_losing_the_good_id(db_session, capsys):
     """Exit code is the only part of this a script reads, so a swallowed typo is silence."""
     exit_code = main(["contribute", "oops", CONTRIBUTED], db=db_session)
