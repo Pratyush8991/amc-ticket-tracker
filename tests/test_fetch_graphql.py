@@ -15,6 +15,7 @@ import pytest
 
 from amc_watch.fetch_core import (
     AccessBlocked,
+    DiscoveryIncomplete,
     FetchUnavailable,
     QueueWalled,
     RateLimited,
@@ -73,6 +74,54 @@ def test_discovery_returns_pre_enriched_showtimes_with_no_second_fetch():
         "AMC Metreon 16",
     )
     assert len(session.posts) == 1  # pre-enriched: one query, no follow-up fetches
+
+
+def test_the_format_is_the_showtimes_own_format_group_attribute():
+    """Live rows answer `format: null` and carry a *mixed* attribute list — Features,
+    Amenities and Accessibility sit beside the formats. Only AMC's own "Format" group
+    counts, most specific first by its `sort`, so an IMAX 70MM row never reports the
+    recliner it also has."""
+    rows = discover_showtimes(
+        METREON, business_date=SATURDAY, session=graphql_serving("metreon_discovery")
+    )
+    odyssey = next(r for r in rows if r.showtime_id == 145377422)
+
+    assert (odyssey.format_code, odyssey.format_name) == ("imax70mm", "IMAX 70MM")
+
+
+def test_a_showtime_with_no_format_attribute_reports_no_format():
+    """An ordinary 2D screening has no Format-group attribute at all. Reporting the
+    first attribute AMC happens to list would write "reservedseating" into the
+    Registry as a format; the honest answer is that there is no format."""
+    rows = discover_showtimes(
+        METREON, business_date=SATURDAY, session=graphql_serving("ordinary_2d_discovery")
+    )
+
+    assert [r.format_code for r in rows] == [""]
+    assert rows[0].movie_name == "The Brink of War"  # a real row, not an error
+
+
+def test_the_seat_read_takes_its_format_from_the_attribute_groups_too():
+    """Recorded live from AMC (showtime 145377417): format is null and the identity
+    rides the attribute connection, where imax70mm(8) leads reservedseating(170)."""
+    page = fetch_seat_page_graphql(
+        145377417, session=graphql_serving("showtime_145377417_seats_recorded")
+    )
+
+    assert (page.format_code, page.format_name) == ("imax70mm", "IMAX 70MM")
+    assert (page.movie_name, page.theatre_name) == ("The Odyssey", "AMC Metreon 16")
+    assert len(page.seats) == 437
+
+
+def test_a_truncated_discovery_is_never_mistaken_for_a_short_day():
+    """Discovery is the only door into the Registry: a capped connection with more
+    pages means Showtimes nobody will ever watch, and that must be louder than a
+    quiet answer."""
+    session = graphql_serving("truncated_discovery")
+
+    with pytest.raises(DiscoveryIncomplete) as e:
+        discover_showtimes(METREON, business_date=SATURDAY, session=session)
+    assert "page size" in str(e.value)
 
 
 def test_discovery_unions_across_format_tabs_and_groups_deduped_by_id():
@@ -242,6 +291,107 @@ def test_a_graphql_transport_failure_is_reported_as_unavailable():
 
     with pytest.raises(FetchUnavailable):
         discover_showtimes(METREON, business_date=SATURDAY, session=FakeGraphQLSession(boom))
+
+
+def test_a_missing_schema_field_is_a_shape_change_not_a_dead_id():
+    """`showtime: null` means the ID is dead; the *field* vanishing means AMC moved
+    the schema and every Watch is blind. The CLI prints a different remedy for each,
+    so conflating them sends the operator to swap IDs forever."""
+    session = FakeGraphQLSession(
+        lambda posted: FakeGraphQLResponse(payload={"data": {"viewer": {}}})
+    )
+
+    with pytest.raises(ShapeChanged):
+        fetch_seat_page_graphql(145377422, session=session)
+
+
+def test_a_missing_theatre_field_is_a_shape_change_not_a_dead_slug():
+    session = FakeGraphQLSession(
+        lambda posted: FakeGraphQLResponse(payload={"data": {"viewer": {}}})
+    )
+
+    with pytest.raises(ShapeChanged):
+        discover_showtimes(METREON, business_date=SATURDAY, session=session)
+
+
+@pytest.mark.parametrize(
+    "errors",
+    [
+        {"message": "a bare object, not a list"},
+        ["a bare string"],
+        [{"message": "well formed"}],
+    ],
+)
+def test_any_shape_of_graphql_errors_still_lands_in_the_taxonomy(errors):
+    """This branch runs when the response is least trustworthy, so the formatter
+    itself must not be the thing that crashes."""
+    session = FakeGraphQLSession(
+        lambda posted: FakeGraphQLResponse(status_code=400, payload={"errors": errors})
+    )
+
+    with pytest.raises(ShapeChanged):
+        discover_showtimes(METREON, business_date=SATURDAY, session=session)
+
+
+def test_a_shape_change_carries_the_showtime_id_it_was_reading():
+    """The ID is what an operator needs to reproduce the loudest failure class, and
+    the shared extractors do not know it."""
+    payload = {
+        "data": {"viewer": {"showtime": {
+            "showtimeId": 145377422,
+            "showDateTimeUtc": "2026-08-15T17:00:00.000Z",
+            "format": {"attributes": [{"code": "imax70mm", "name": "IMAX 70MM"}]},
+            "movie": {"name": "The Odyssey"},  # movieId gone
+            "theatre": {"theatreId": 2325, "name": "AMC Metreon 16"},
+            "seatingLayout": {"seats": [
+                {"name": "K10", "row": 10, "column": 25, "available": True, "type": "CanReserve"}
+            ]},
+        }}}
+    }
+    session = FakeGraphQLSession(lambda posted: FakeGraphQLResponse(payload=payload))
+
+    with pytest.raises(ShapeChanged) as e:
+        fetch_seat_page_graphql(145377422, session=session)
+    assert e.value.showtime_id == 145377422
+
+
+def test_an_unreadable_id_is_a_shape_change_not_a_value_error():
+    """A schema change to a string-formatted ID passes the missing-field check; it
+    must still land in the taxonomy every caller catches on."""
+    payload = {"data": {"viewer": {"theatres": {
+        "pageInfo": {"hasNextPage": False, "endCursor": None},
+        "edges": [{"node": {"theatreId": "two thousand", "slug": "amc-metreon-16"}}],
+    }}}}
+    session = FakeGraphQLSession(lambda posted: FakeGraphQLResponse(payload=payload))
+
+    with pytest.raises(ShapeChanged):
+        enumerate_theatres(session=session)
+
+
+def test_theatre_paging_refuses_to_walk_a_cursor_that_never_advances():
+    """A repeating cursor would POST the same page forever — the surest way to turn a
+    polite client into a blocked one."""
+    page = {"data": {"viewer": {"theatres": {
+        "pageInfo": {"hasNextPage": True, "endCursor": "stuck"},
+        "edges": [{"node": {"theatreId": 6, "slug": "amc-esquire-7", "name": "AMC Esquire 7"}}],
+    }}}}
+    session = FakeGraphQLSession(lambda posted: FakeGraphQLResponse(payload=page))
+
+    with pytest.raises(ShapeChanged) as e:
+        enumerate_theatres(session=session)
+    assert "not advancing" in str(e.value)
+    assert len(session.posts) < 5  # it stopped, rather than hammering AMC
+
+
+def test_the_date_patch_leaves_exactly_one_session_cookie():
+    """The jar keys on (domain, name): setting ours beside the warm-up's host-only
+    cookie would put two `session` values on the wire and let AMC choose the date."""
+    session = graphql_serving("metreon_discovery", cookies={"session": quote('{"nowInDays": 1}')})
+    discover_showtimes(METREON, business_date=SATURDAY, session=session)
+
+    [(domain, value)] = session.cookies.entries("session")
+    assert domain == ".amctheatres.com"
+    assert json.loads(unquote(value))["nowInDays"] == 20680
 
 
 def test_the_graphql_post_presents_itself_as_the_browser_would():

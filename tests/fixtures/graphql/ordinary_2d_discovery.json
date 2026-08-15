@@ -1,0 +1,99 @@
+{
+ "data": {
+  "viewer": {
+   "theatre": {
+    "theatreId": 2325,
+    "name": "AMC Metreon 16",
+    "slug": "amc-metreon-16",
+    "formats": {
+     "items": [
+      {
+       "attributes": [
+        {
+         "name": "Reserved Seating",
+         "code": "reservedseating"
+        }
+       ],
+       "groups": {
+        "pageInfo": {
+         "hasNextPage": false
+        },
+        "edges": [
+         {
+          "node": {
+           "showtimes": {
+            "pageInfo": {
+             "hasNextPage": false
+            },
+            "edges": [
+             {
+              "node": {
+               "showtimeId": 145966600,
+               "showDateTimeUtc": "2026-08-15T19:30:00.000Z",
+               "status": "Scheduled",
+               "auditorium": 4,
+               "isReservedSeating": true,
+               "format": null,
+               "attributes": {
+                "edges": [
+                 {
+                  "node": {
+                   "code": "reclinerseating",
+                   "name": "Recliner Seating",
+                   "sort": 54,
+                   "groups": [
+                    {
+                     "id": 4,
+                     "name": "Features"
+                    }
+                   ]
+                  }
+                 },
+                 {
+                  "node": {
+                   "code": "reservedseating",
+                   "name": "Reserved Seating",
+                   "sort": 170,
+                   "groups": [
+                    {
+                     "id": 2,
+                     "name": "Amenities"
+                    }
+                   ]
+                  }
+                 },
+                 {
+                  "node": {
+                   "code": "closedcaption",
+                   "name": "Closed Caption",
+                   "sort": 200,
+                   "groups": [
+                    {
+                     "id": 1,
+                     "name": "Accessibility"
+                    }
+                   ]
+                  }
+                 }
+                ]
+               },
+               "movie": {
+                "name": "The Brink of War",
+                "slug": "the-brink-of-war",
+                "movieId": 79001
+               }
+              }
+             }
+            ]
+           }
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   }
+  }
+ }
+}

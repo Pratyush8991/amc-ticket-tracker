@@ -6,9 +6,14 @@ SeatPage metadata extraction are literally shared with the RSC side (`parse_seat
 `showtime_fields`), so both backends stay one value object by construction.
 """
 
-from ..errors import ShapeChanged, ShowtimeNotFound, TheatreNotFound
+from ..errors import (
+    DiscoveryIncomplete,
+    ShapeChanged,
+    ShowtimeNotFound,
+    TheatreNotFound,
+)
 from ..model import DiscoveredShowtime, SeatPage, Theatre
-from ..parse import _format_of, parse_seats, parse_starts_at, showtime_fields
+from ..parse import _format_of, parse_int, parse_seats, parse_starts_at, showtime_fields
 
 
 def _viewer(payload, what):
@@ -34,7 +39,7 @@ def _theatre(node):
     if missing:
         raise ShapeChanged(f"graphql theatres: theatre missing {', '.join(missing)}")
     return Theatre(
-        theatre_id=int(node["theatreId"]),
+        theatre_id=parse_int(node["theatreId"], "graphql theatres: theatreId"),
         slug=node["slug"],
         name=node.get("name") or "",
         city=node.get("city") or "",
@@ -55,10 +60,15 @@ def parse_discovery(payload, theatre_slug):
 
     The same Showtime can appear under several format tabs (e.g. both "IMAX" and
     "IMAX 70MM"), so rows are unioned across all tabs and groups and deduped by
-    showtime ID, first appearance winning. An empty result is an answer — a theatre
-    with nothing scheduled that day — never an exception.
+    showtime ID. Each row carries its *own* Format-group attributes, so which tab it
+    was found under never decides its format. An empty result is an answer — a theatre
+    with nothing scheduled that day — never an exception; a *truncated* result is not,
+    and raises DiscoveryIncomplete.
     """
-    theatre = _viewer(payload, "graphql discovery").get("theatre")
+    viewer = _viewer(payload, "graphql discovery")
+    if "theatre" not in viewer:
+        raise ShapeChanged("graphql discovery: response has no theatre field")
+    theatre = viewer["theatre"]
     if theatre is None:
         # AMC answered: nothing lives at this slug. Stale config, not a quiet day.
         raise TheatreNotFound(f"GraphQL says there is no theatre at slug {theatre_slug!r}")
@@ -69,23 +79,34 @@ def parse_discovery(payload, theatre_slug):
 
     rows, seen = [], set()
     for item in (theatre.get("formats") or {}).get("items") or []:
-        # Live rows carry `format: null`; the format identity lives on the enclosing
-        # tab's attributes, most specific first (observed live 2026-08-14 — the
-        # IMAX 70MM tab lists [imax70mm, imax, 70mm]).
-        tab_attributes = item.get("attributes") or []
-        tab_format = tab_attributes[0] if tab_attributes else {}
-        for group_edge in (item.get("groups") or {}).get("edges") or []:
-            showtimes = ((group_edge.get("node") or {}).get("showtimes") or {}).get("edges") or []
-            for edge in showtimes:
-                row = _discovered_row(edge.get("node") or {}, theatre, theatre_slug, tab_format)
+        groups = item.get("groups") or {}
+        _refuse_truncation(groups, "groups", theatre_slug)
+        for group_edge in groups.get("edges") or []:
+            showtimes = ((group_edge.get("node") or {}).get("showtimes") or {})
+            _refuse_truncation(showtimes, "showtimes", theatre_slug)
+            for edge in showtimes.get("edges") or []:
+                row = _discovered_row(edge.get("node") or {}, theatre, theatre_slug)
                 if row.showtime_id not in seen:
                     seen.add(row.showtime_id)
                     rows.append(row)
     return tuple(rows)
 
 
-def _discovered_row(node, theatre, theatre_slug, tab_format):
-    fmt = _format_of(node) or tab_format
+def _refuse_truncation(connection, what, theatre_slug):
+    """A capped connection that has more pages means Showtimes we never saw.
+
+    Discovery is the only way into the Registry, so a partial answer must be louder
+    than a quiet short list — the caller cannot tell the two apart otherwise.
+    """
+    if (connection.get("pageInfo") or {}).get("hasNextPage"):
+        raise DiscoveryIncomplete(
+            f"graphql discovery: {theatre_slug} has more {what} than one query "
+            f"carries — raise the page size or paginate before trusting the Registry"
+        )
+
+
+def _discovered_row(node, theatre, theatre_slug):
+    fmt = _format_of(node)
     movie = node.get("movie") or {}
     missing = [
         k
@@ -98,18 +119,24 @@ def _discovered_row(node, theatre, theatre_slug, tab_format):
     ]
     if missing:
         raise ShapeChanged(f"graphql discovery: showtime row missing {', '.join(missing)}")
+    showtime_id = parse_int(node["showtimeId"], "graphql discovery: showtimeId")
+    auditorium = node.get("auditorium")
     return DiscoveredShowtime(
-        showtime_id=int(node["showtimeId"]),
-        theatre_id=int(theatre["theatreId"]),
+        showtime_id=showtime_id,
+        theatre_id=parse_int(theatre["theatreId"], "graphql discovery: theatreId", showtime_id),
         theatre_slug=theatre.get("slug") or theatre_slug,
         theatre_name=theatre.get("name") or "",
-        movie_id=int(movie["movieId"]),
+        movie_id=parse_int(movie["movieId"], "graphql discovery: movie.movieId", showtime_id),
         movie_name=movie.get("name") or "",
         movie_slug=movie.get("slug") or "",
         format_code=fmt["code"],
         format_name=fmt.get("name") or "",
         starts_at_utc=parse_starts_at(node.get("showDateTimeUtc"), "graphql discovery"),
-        auditorium=int(node["auditorium"]) if node.get("auditorium") is not None else None,
+        auditorium=(
+            parse_int(auditorium, "graphql discovery: auditorium", showtime_id)
+            if auditorium is not None
+            else None
+        ),
         status=str(node.get("status") or ""),
         is_reserved_seating=bool(node.get("isReservedSeating")),
     )
@@ -117,13 +144,25 @@ def _discovered_row(node, theatre, theatre_slug, tab_format):
 
 def parse_seat_response(payload, showtime_id):
     """Reduce a seat-query response to a SeatPage."""
-    node = _viewer(payload, "graphql seat read").get("showtime")
+    viewer = _viewer(payload, "graphql seat read")
+    # `showtime: null` is AMC saying the ID is dead; the *key* missing means the schema
+    # moved under us. Telling them apart matters: one remedy is "pass a fresh ID", the
+    # other is "every Watch is blind until fetch-core is updated".
+    if "showtime" not in viewer:
+        raise ShapeChanged("graphql seat read: response has no showtime field", showtime_id)
+    node = viewer["showtime"]
     if node is None:
-        # The GraphQL analogue of the Seat Page's 404: a dead or never-real ID.
         raise ShowtimeNotFound("GraphQL says there is no such showtime", showtime_id)
     if not isinstance(node, dict):
         raise ShapeChanged("graphql seat read: response has no showtime object", showtime_id)
     layout = node.get("seatingLayout")
     if not isinstance(layout, dict) or "seats" not in layout:
         raise ShapeChanged("graphql seat read: showtime has no seatingLayout", showtime_id)
-    return SeatPage(seats=parse_seats(layout), **showtime_fields(node))
+    try:
+        return SeatPage(seats=parse_seats(layout), **showtime_fields(node))
+    except ShapeChanged as e:
+        # The shared extractors do not know which showtime they are reading; the ID is
+        # the one thing an operator needs to reproduce the loudest failure class.
+        if e.showtime_id is None:
+            e.showtime_id = showtime_id
+        raise

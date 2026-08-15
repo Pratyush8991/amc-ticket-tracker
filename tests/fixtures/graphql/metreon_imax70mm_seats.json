@@ -4,44 +4,11 @@
    "showtime": {
     "showtimeId": 144696966,
     "showDateTimeUtc": "2026-08-09T17:00:00.000Z",
-    "format": null,
-    "attributes": {
-     "edges": [
+    "format": {
+     "attributes": [
       {
-       "node": {
-        "code": "imax70mm",
-        "name": "IMAX 70MM"
-       }
-      },
-      {
-       "node": {
-        "code": "imax",
-        "name": "IMAX at AMC"
-       }
-      },
-      {
-       "node": {
-        "code": "70mm",
-        "name": "70mm"
-       }
-      },
-      {
-       "node": {
-        "code": "amcclubrockers",
-        "name": "AMC Club Rockers"
-       }
-      },
-      {
-       "node": {
-        "code": "amcartisanfilms",
-        "name": "AMC Artisan Films"
-       }
-      },
-      {
-       "node": {
-        "code": "reservedseating",
-        "name": "Reserved Seating"
-       }
+       "code": "imax70mm",
+       "name": "IMAX 70MM"
       }
      ]
     },

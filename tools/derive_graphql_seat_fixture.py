@@ -11,35 +11,29 @@ Writes: tests/fixtures/graphql/metreon_imax70mm_seats.json
 """
 
 import json
+import sys
 from pathlib import Path
 
 REPO = Path(__file__).parent.parent
+sys.path.insert(0, str(REPO / "src"))
+
+# The unescaping and object-walking rules are the parser's, not this tool's: importing
+# them keeps a fixture derived under the same rules the parser reads it back with.
+from amc_watch.fetch_core.parse import (  # noqa: E402
+    _enclosing_object_start,
+    unescape_payload,
+)
+
 SOURCE = REPO / "tests" / "fixtures" / "rsc" / "metreon_imax70mm_as_recorded.rsc.txt"
 TARGET = REPO / "tests" / "fixtures" / "graphql" / "metreon_imax70mm_seats.json"
-
-
-def _unescape(html):
-    return html.replace('\\"', '"').replace("\\\\", "\\")
-
-
-def _enclosing_object_start(text, at):
-    depth = 0
-    for i in range(at - 1, -1, -1):
-        c = text[i]
-        if c == "}":
-            depth += 1
-        elif c == "{":
-            if depth == 0:
-                return i
-            depth -= 1
-    raise SystemExit("no enclosing object found")
 
 
 def _object_around(text, anchor):
     at = text.find(anchor)
     if at == -1:
         raise SystemExit(f"{anchor} not found in the RSC fixture")
-    obj, _ = json.JSONDecoder().raw_decode(text, _enclosing_object_start(text, at))
+    start = _enclosing_object_start(text, at, "fixture derivation")
+    obj, _ = json.JSONDecoder().raw_decode(text, start)
     return obj
 
 
@@ -52,16 +46,19 @@ def _object_after(text, anchor):
 
 
 def main():
-    text = _unescape(SOURCE.read_text())
+    text = unescape_payload(SOURCE.read_text())
     showtime = _object_around(text, '"showDateTimeUtc"')
     layout = _object_after(text, '"seatingLayout"')
 
-    # Live (2026-08-14), viewer.showtime answers `format: null`; the format identity
-    # rides the AttributeConnection instead, format attribute first — exactly the
-    # `attributes` edges the RSC embed also carries, which is what we copy here.
-    attribute_edges = [
-        {"node": {"code": e["node"]["code"], "name": e["node"]["name"]}}
-        for e in (showtime.get("attributes") or {}).get("edges") or []
+    # The RSC embed types `format` as a Relay connection; the schema we query types it
+    # as ShowtimeMovieFormat with a plain `attributes` list, so the format AMC reported
+    # for this showtime is re-shaped (not invented) into the type our query asks for.
+    # The RSC embed carries no attribute *groups*, so this fixture cannot stand in for
+    # the live `format: null` shape — tests/fixtures/graphql/*_recorded.json, taken from
+    # the live endpoint by tools/record_graphql_fixtures.py, covers that.
+    format_attributes = [
+        {"code": e["node"]["code"], "name": e["node"]["name"]}
+        for e in (showtime.get("format") or {}).get("edges") or []
     ]
 
     response = {
@@ -70,8 +67,7 @@ def main():
                 "showtime": {
                     "showtimeId": showtime["showtimeId"],
                     "showDateTimeUtc": showtime["showDateTimeUtc"],
-                    "format": None,
-                    "attributes": {"edges": attribute_edges},
+                    "format": {"attributes": format_attributes},
                     "movie": {
                         "movieId": showtime["movie"]["movieId"],
                         "name": showtime["movie"]["name"],

@@ -52,6 +52,15 @@ class TheatreNotFound(FetchError):
     """
 
 
+class DiscoveryIncomplete(FetchError):
+    """AMC had more showtimes for this theatre than one query could carry.
+
+    Not a shape change — the payload was exactly what we asked for — but the answer is
+    partial, and a partial Discovery is a Registry that silently misses Showtimes. The
+    remedy is ours: raise the page sizes or paginate the nested connections.
+    """
+
+
 class RateLimited(FetchError):
     """429 — we asked too often.
 

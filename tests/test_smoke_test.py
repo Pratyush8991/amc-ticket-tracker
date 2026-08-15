@@ -12,6 +12,7 @@ from amc_watch.cli import main
 
 from .conftest import (
     QUEUE_URL,
+    FakeGraphQLResponse,
     FakeResponse,
     FakeSession,
     Redirect,
@@ -144,6 +145,67 @@ def test_the_theatre_slug_can_be_overridden(capsys):
 
     assert exit_code == 0
     assert graphql_session.posts[0]["json"]["variables"]["slug"] == "amc-empire-25"
+
+
+class UnreachableWarmup:
+    """A curl_cffi session whose warm-up GET fails the way a fresh box's does."""
+
+    def __init__(self, boom=None, status_code=200):
+        self.boom = boom
+        self.status_code = status_code
+        self.closed = False
+
+    def get(self, url, timeout=None):
+        if self.boom:
+            raise self.boom
+        return FakeGraphQLResponse(payload={}, status_code=self.status_code, url=url)
+
+    def close(self):
+        self.closed = True
+
+
+@pytest.fixture
+def warmup_session(monkeypatch):
+    """Point open_graphql_session's curl_cffi import at a session we control."""
+
+    def install(session):
+        import curl_cffi.requests
+
+        monkeypatch.setattr(curl_cffi.requests, "Session", lambda **kw: session)
+        return session
+
+    return install
+
+
+def test_a_box_that_cannot_even_warm_its_cookie_jar_fails_readably(capsys, warmup_session):
+    """The likeliest failure on a fresh box, and the whole reason the command exists:
+    it must print the remedy, not a traceback out of curl_cffi."""
+    session = warmup_session(UnreachableWarmup(boom=OSError("connection reset")))
+
+    exit_code = main(
+        ["smoke-test"], session=serving("metreon_imax70mm_as_recorded"), graphql_session=None
+    )
+    out = capsys.readouterr().out
+
+    assert exit_code != 0
+    assert "FAIL" in out
+    assert "connection reset" in out
+    assert session.closed  # the half-built session is not leaked
+
+
+def test_a_warm_up_that_is_refused_names_the_datacenter_contingency(capsys, warmup_session):
+    """A 403 warming the jar is the same door-in-the-face as a 403 at the graph host,
+    and earns the same ADR-0004 remedy rather than a confusing downstream error."""
+    warmup_session(UnreachableWarmup(status_code=403))
+
+    exit_code = main(
+        ["smoke-test"], session=serving("metreon_imax70mm_as_recorded"), graphql_session=None
+    )
+    out = capsys.readouterr().out
+
+    assert exit_code != 0
+    assert "403" in out
+    assert "re-home the poller" in out
 
 
 @pytest.mark.live

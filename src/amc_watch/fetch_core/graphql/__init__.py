@@ -7,6 +7,7 @@ from .client import (
     discover_showtimes,
     enumerate_theatres,
     fetch_seat_page_graphql,
+    graphql_session,
     open_graphql_session,
 )
 
@@ -17,5 +18,6 @@ __all__ = [
     "discover_showtimes",
     "enumerate_theatres",
     "fetch_seat_page_graphql",
+    "graphql_session",
     "open_graphql_session",
 ]

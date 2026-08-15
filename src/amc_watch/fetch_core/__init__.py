@@ -10,6 +10,7 @@ Two backends, one set of domain models and one error taxonomy:
 
 from .client import DEFAULT_TIMEOUT, HEADERS, fetch_seat_page, seat_page_url
 from .errors import (
+    DiscoveryIncomplete,
     AccessBlocked,
     FetchError,
     FetchUnavailable,
@@ -23,6 +24,7 @@ from .graphql import (
     discover_showtimes,
     enumerate_theatres,
     fetch_seat_page_graphql,
+    graphql_session,
     open_graphql_session,
 )
 from .model import BOOKABLE_TYPES, DiscoveredShowtime, Seat, SeatPage, Theatre
@@ -33,6 +35,7 @@ __all__ = [
     "DEFAULT_TIMEOUT",
     "HEADERS",
     "AccessBlocked",
+    "DiscoveryIncomplete",
     "FetchError",
     "FetchUnavailable",
     "QueueWalled",
@@ -48,6 +51,7 @@ __all__ = [
     "enumerate_theatres",
     "fetch_seat_page",
     "fetch_seat_page_graphql",
+    "graphql_session",
     "open_graphql_session",
     "parse_seat_page",
     "seat_page_url",

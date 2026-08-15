@@ -7,6 +7,8 @@ extraction. The showtime id is inlined as an int literal (the confirmed form) ra
 than a typed variable, because the argument's schema type name is unverified.
 """
 
+from ..parse import parse_int
+
 THEATRES_QUERY = """
 query Theatres(
   $query: String
@@ -65,9 +67,11 @@ query TheatreShowtimes($slug: String!) {
         items {
           attributes { name code }
           groups(first: 100) {
+            pageInfo { hasNextPage }
             edges {
               node {
                 showtimes(first: 200) {
+                  pageInfo { hasNextPage }
                   edges {
                     node {
                       showtimeId
@@ -76,6 +80,7 @@ query TheatreShowtimes($slug: String!) {
                       auditorium
                       isReservedSeating
                       format { attributes { code name } }
+                      attributes { edges { node { code name sort groups { id name } } } }
                       movie { name slug movieId }
                     }
                   }
@@ -98,7 +103,7 @@ _SEAT_QUERY = """
       showtimeId
       showDateTimeUtc
       format { attributes { code name } }
-      attributes { edges { node { code name } } }
+      attributes { edges { node { code name sort groups { id name } } } }
       movie { movieId name }
       theatre { theatreId name }
       seatingLayout {
@@ -113,4 +118,6 @@ _SEAT_QUERY = """
 
 
 def seat_query(showtime_id):
-    return _SEAT_QUERY.replace("$SHOWTIME_ID", str(int(showtime_id)))
+    return _SEAT_QUERY.replace(
+        "$SHOWTIME_ID", str(parse_int(showtime_id, "graphql seat read: showtime id"))
+    )

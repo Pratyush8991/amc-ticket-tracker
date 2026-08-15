@@ -16,6 +16,7 @@ from datetime import date
 
 from .fetch_core import (
     AccessBlocked,
+    DiscoveryIncomplete,
     FetchError,
     QueueWalled,
     RateLimited,
@@ -62,6 +63,11 @@ REMEDIES = {
     RateLimited: (
         "AMC rate-limited this box. This one is our fault, not theirs: wait several "
         "minutes before retrying, and do not tighten the Polling Budget on this box."
+    ),
+    DiscoveryIncomplete: (
+        "This theatre has more showtimes than one discovery query carries, so the "
+        "Registry would silently miss some. Raise the page sizes in the discovery "
+        "query (or paginate them) before trusting discovery at this theatre."
     ),
     ShapeChanged: (
         "The host answered, but not with what we asked for. Either AMC changed the "

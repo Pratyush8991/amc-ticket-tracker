@@ -83,18 +83,38 @@ def serving(fixture_name):
 
 
 class FakeCookieJar:
-    """The slice of the curl_cffi cookie jar the client touches."""
+    """The slice of the curl_cffi cookie jar the client touches.
+
+    Keyed by (domain, name) exactly as the real jar is, because that dimension is
+    load-bearing: a warm-up cookie set host-only on www and ours set on the parent
+    domain are two *different* entries, both sent to AMC, and a flat name→value dict
+    would quietly hide that.
+    """
 
     def __init__(self, cookies=None):
-        self._store = dict(cookies or {})
+        self._store = {}
+        for name, value in (cookies or {}).items():
+            self._store[("www.amctheatres.com", name)] = value
         self.set_calls = []
 
+    def _matching(self, name):
+        return [key for key in self._store if key[1] == name]
+
     def get(self, name, default=None):
-        return self._store.get(name, default)
+        matches = self._matching(name)
+        return self._store[matches[-1]] if matches else default
 
     def set(self, name, value, domain=None, path="/"):
-        self._store[name] = value
+        self._store[(domain or "", name)] = value
         self.set_calls.append({"name": name, "value": value, "domain": domain})
+
+    def delete(self, name, domain=None, path=None):
+        for key in [k for k in self._matching(name) if domain in (None, k[0])]:
+            del self._store[key]
+
+    def entries(self, name):
+        """Every (domain, value) pair stored under `name` — what AMC would receive."""
+        return [(key[0], self._store[key]) for key in self._matching(name)]
 
 
 class FakeGraphQLResponse:

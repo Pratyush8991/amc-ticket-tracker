@@ -116,16 +116,57 @@ def _first_edge_node(obj, key):
     return (edges[0].get("node") or {}) if edges else {}
 
 
+# AMC files every showtime attribute under one of its own groups — Format(3),
+# Features(4), Amenities(2), Accessibility(1) — which is how a Format is told apart from
+# a recliner or a closed-caption marker *without* hardcoding any format code (confirmed
+# by introspection + live sample, 2026-08-14). Matched on id or name so a rename of
+# either one alone does not blind us.
+FORMAT_ATTRIBUTE_GROUP_ID = 3
+FORMAT_ATTRIBUTE_GROUP_NAME = "Format"
+
+# A showtime AMC files under no Format attribute at all — an ordinary screening with no
+# premium presentation. Distinct from "we could not find any format information", which
+# is a shape change.
+NO_FORMAT = {"code": "", "name": ""}
+
+
+def _is_format_attribute(node):
+    return any(
+        (group or {}).get("id") == FORMAT_ATTRIBUTE_GROUP_ID
+        or (group or {}).get("name") == FORMAT_ATTRIBUTE_GROUP_NAME
+        for group in node.get("groups") or []
+    )
+
+
+def format_attributes(obj):
+    """A showtime's Format-group attributes, most specific first.
+
+    AMC's `sort` orders them by specificity within the group (imax70mm 8 < imax 11 <
+    70mm 23), so the first entry is the format to record.
+    """
+    nodes = [
+        node
+        for edge in (obj.get("attributes") or {}).get("edges") or []
+        if _is_format_attribute(node := edge.get("node") or {})
+    ]
+    return sorted(nodes, key=lambda n: n.get("sort") if n.get("sort") is not None else 10**6)
+
+
 def _format_of(obj):
     """A showtime object's Format node — {code, name}.
 
     The same idea arrives in three shapes (all observed 2026-08-14): the RSC payload
     embeds `format` as a Relay connection (edges/node); the discovery schema types it
-    as ShowtimeMovieFormat with a plain `attributes` list; and the live seat read
-    answers `format: null` with the identity riding the showtime's own
-    AttributeConnection instead — format attribute first, as the RSC embed's
-    attribute order also shows. First entry of whichever shape arrived; missing → {}
-    and the caller's required-field check reports it.
+    as ShowtimeMovieFormat with a plain `attributes` list; and live GraphQL answers
+    `format: null` with the identity riding the showtime's own AttributeConnection.
+
+    In that third shape the connection is a *mixed* bag — Features, Amenities and
+    Accessibility attributes sit alongside the formats, and it is ordered by AMC's
+    global `sort`, so the first entry is frequently not a format at all (an ordinary
+    2D showtime leads with `reservedseating`). Only Format-group members are eligible.
+    Returns NO_FORMAT when AMC listed attributes but none were formats; returns {} when
+    there was no format information to read at all, which the caller reports as a shape
+    change.
     """
     container = obj.get("format") or {}
     if "edges" in container:
@@ -133,7 +174,10 @@ def _format_of(obj):
     attributes = container.get("attributes") or []
     if attributes:
         return attributes[0]
-    return _first_edge_node(obj, "attributes")
+    if "attributes" not in obj:
+        return {}
+    formats = format_attributes(obj)
+    return formats[0] if formats else NO_FORMAT
 
 
 def parse_starts_at(raw, what):
@@ -142,6 +186,19 @@ def parse_starts_at(raw, what):
         return datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except (AttributeError, ValueError) as e:
         raise ShapeChanged(f"{what}: unreadable showDateTimeUtc {raw!r}") from e
+
+
+def parse_int(value, what, showtime_id=None):
+    """AMC's numeric IDs → int, or ShapeChanged.
+
+    A schema change to a string- or float-formatted ID passes the callers' `is None`
+    missing-field checks and would otherwise surface as a bare ValueError, outside the
+    error taxonomy every caller catches on.
+    """
+    try:
+        return int(value)
+    except (TypeError, ValueError) as e:
+        raise ShapeChanged(f"{what}: unreadable integer {value!r}", showtime_id) from e
 
 
 def parse_showtime(text):
@@ -179,10 +236,10 @@ def showtime_fields(obj):
     if missing:
         raise ShapeChanged(f"showtime metadata: missing {', '.join(missing)}")
     return {
-        "showtime_id": int(obj["showtimeId"]),
-        "movie_id": int(movie["movieId"]),
+        "showtime_id": parse_int(obj["showtimeId"], "showtime metadata: showtimeId"),
+        "movie_id": parse_int(movie["movieId"], "showtime metadata: movie.movieId"),
         "movie_name": movie.get("name") or "",
-        "theatre_id": int(theatre["theatreId"]),
+        "theatre_id": parse_int(theatre["theatreId"], "showtime metadata: theatre.theatreId"),
         "theatre_name": theatre.get("name") or "",
         "format_code": fmt["code"],
         "format_name": fmt.get("name") or "",

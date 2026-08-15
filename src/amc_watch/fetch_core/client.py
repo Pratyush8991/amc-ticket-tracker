@@ -1,11 +1,14 @@
-"""The one outbound edge of the whole system: GET a Seat Page.
+"""One of the system's two outbound edges: GET a Seat Page.
+
+A *seat-read fallback* since ADR-0005 — never Discovery, which belongs to the GraphQL
+backend next door. It earns its keep by failing independently: a different host, a
+different transport, a different payload shape.
 
 Transport behavior here is load-bearing and ported intact from the proven single-user
 watcher (ADR-0003): python-requests with a browser User-Agent passes AMC's Cloudflare
 hardening where curl 403s. A fresh Session per fetch (requests.Session is not guaranteed
 thread-safe) and a browser Accept/Accept-Language pair are part of that behavior, not
-incidental style. Never replace this with a headless browser — AMC flags automation
-(ADR-0001).
+incidental style. Never replace this with a headless browser — AMC flags automation.
 
 This module is also the seam the test suite fakes: tests inject a session that serves
 recorded RSC payloads, so fetch → parse runs for real in every test.
