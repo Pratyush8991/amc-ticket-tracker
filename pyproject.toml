@@ -4,9 +4,12 @@ version = "0.1.0"
 description = "Invite-only hosted seat-watching service for AMC Seat Pages"
 requires-python = ">=3.12"
 dependencies = [
-    # The fetch core's transport behavior is load-bearing: python-requests passes AMC's
-    # Cloudflare hardening where curl 403s (ADR-0003). Do not swap this out casually.
+    # Transport behavior is load-bearing and per-host (ADR-0003 as amended, ADR-0005):
+    # python-requests passes AMC's Cloudflare hardening on www.amctheatres.com where curl
+    # 403s; graph.amctheatres.com 403s requests AND curl and needs curl_cffi's browser
+    # TLS fingerprint. Do not swap either out casually.
     "requests>=2.31",
+    "curl_cffi>=0.7",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "sqlalchemy>=2.0",

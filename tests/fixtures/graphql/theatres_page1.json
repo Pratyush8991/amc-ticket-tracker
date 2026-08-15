@@ -1,0 +1,46 @@
+{
+ "data": {
+  "viewer": {
+   "theatres": {
+    "count": 3,
+    "pageInfo": {"hasNextPage": true, "endCursor": "cGM6MToxOjI="},
+    "edges": [
+     {
+      "node": {
+       "theatreId": 6,
+       "name": "AMC Esquire 7",
+       "slug": "amc-esquire-7",
+       "city": "Saint Louis",
+       "state": "Missouri",
+       "postalCode": "63105",
+       "latitude": 38.6485,
+       "longitude": -90.305,
+       "marketSlug": "saint-louis",
+       "utcOffset": "-05:00",
+       "timezoneAbbreviation": "CDT",
+       "ticketable": true,
+       "isInOutage": false
+      }
+     },
+     {
+      "node": {
+       "theatreId": 24,
+       "name": "AMC Streets of St. Charles 8",
+       "slug": "amc-streets-of-st-charles-8",
+       "city": "Saint Charles",
+       "state": "Missouri",
+       "postalCode": "63301",
+       "latitude": 38.7797,
+       "longitude": -90.4993,
+       "marketSlug": "saint-louis",
+       "utcOffset": "-05:00",
+       "timezoneAbbreviation": "CDT",
+       "ticketable": true,
+       "isInOutage": false
+      }
+     }
+    ]
+   }
+  }
+ }
+}

@@ -297,8 +297,9 @@ flowchart LR
 - **The Seat Page describes itself / discovery rows arrive enriched** — showtime metadata is
   never user-supplied; format codes (e.g. InfinityVision) are stored exactly as reported,
   never hardcoded.
-- **`SeatPageShapeChanged` is loud** — a parser regression fails, never silently reads "no
-  seats". "AMC blocked us" and "no seats open" must never look alike.
+- **`ShapeChanged` is loud** — a parser regression fails, never silently reads "no
+  seats". "AMC blocked us" and "no seats open" must never look alike, and a partial
+  discovery (`DiscoveryIncomplete`) is never a short one.
 
 References: `CONTEXT.md` (glossary), `docs/adr/0001`–`0005`, `docs/research/amc-discovery-mechanisms.md` (verified queries).
 </content>

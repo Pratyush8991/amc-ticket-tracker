@@ -1,0 +1,29 @@
+{
+ "data": {
+  "viewer": {
+   "theatres": {
+    "count": 3,
+    "pageInfo": {"hasNextPage": false, "endCursor": "cGM6MToxOjM="},
+    "edges": [
+     {
+      "node": {
+       "theatreId": 25,
+       "name": "AMC Ward Parkway 14",
+       "slug": "amc-ward-parkway-14",
+       "city": "Kansas City",
+       "state": "Missouri",
+       "postalCode": "64114",
+       "latitude": 38.9634,
+       "longitude": -94.6075,
+       "marketSlug": "kansas-city",
+       "utcOffset": "-05:00",
+       "timezoneAbbreviation": "CDT",
+       "ticketable": true,
+       "isInOutage": false
+      }
+     }
+    ]
+   }
+  }
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "data": {
+  "viewer": {
+   "theatre": {
+    "theatreId": 2325,
+    "name": "AMC Metreon 16",
+    "slug": "amc-metreon-16",
+    "formats": {
+     "items": []
+    }
+   }
+  }
+ }
+}

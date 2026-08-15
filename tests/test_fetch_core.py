@@ -13,8 +13,8 @@ from amc_watch.fetch_core import (
     AccessBlocked,
     QueueWalled,
     RateLimited,
-    SeatPageShapeChanged,
-    SeatPageUnavailable,
+    ShapeChanged,
+    FetchUnavailable,
     ShowtimeNotFound,
     fetch_seat_page,
 )
@@ -129,7 +129,7 @@ def test_queue_wall_is_distinct_from_no_seats():
         (403, AccessBlocked),
         (404, ShowtimeNotFound),
         (429, RateLimited),
-        (500, SeatPageUnavailable),
+        (500, FetchUnavailable),
     ],
 )
 def test_http_failures_surface_as_distinct_errors(status, expected):
@@ -152,7 +152,7 @@ def test_rate_limiting_is_our_fault_not_amcs():
 
 def test_a_page_without_a_seating_layout_is_loudest():
     """If AMC changes shape, every Watch goes blind — never report that as "no seats"."""
-    with pytest.raises(SeatPageShapeChanged):
+    with pytest.raises(ShapeChanged):
         fetch_seat_page(144696966, session=responding(text="<html>hello</html>"))
 
 
@@ -162,7 +162,7 @@ def test_a_transport_failure_is_reported_as_unavailable():
     def boom(url):
         raise requests.ConnectionError("connection reset")
 
-    with pytest.raises(SeatPageUnavailable):
+    with pytest.raises(FetchUnavailable):
         fetch_seat_page(144696966, session=FakeSession(boom))
 
 

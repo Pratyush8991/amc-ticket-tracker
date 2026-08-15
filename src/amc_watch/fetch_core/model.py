@@ -39,6 +39,55 @@ class Seat:
 
 
 @dataclass(frozen=True)
+class Theatre:
+    """One AMC location as the GraphQL theatres connection reports it.
+
+    The `slug` is the load-bearing field — it is what the showtime-discovery query
+    targets (CONTEXT.md, "Theatre"); the rest powers theatre pickers and geo search.
+    """
+
+    theatre_id: int
+    slug: str
+    name: str
+    city: str
+    state: str
+    postal_code: str
+    latitude: float | None
+    longitude: float | None
+    market_slug: str
+    utc_offset: str
+    timezone_abbreviation: str
+    ticketable: bool
+    is_in_outage: bool
+
+
+@dataclass(frozen=True)
+class DiscoveredShowtime:
+    """One screening as Discovery reports it — already whole.
+
+    Rows arrive pre-enriched from the GraphQL discovery query (CONTEXT.md,
+    "Showtime"): movie, format, start time, auditorium and theatre all come with the
+    row, so nothing downstream ever fetches or invents Showtime metadata. `status` and
+    `format_code` are stored verbatim as AMC reports them — codes (InfinityVision's
+    included) are never hardcoded.
+    """
+
+    showtime_id: int
+    theatre_id: int
+    theatre_slug: str
+    theatre_name: str
+    movie_id: int
+    movie_name: str
+    movie_slug: str
+    format_code: str
+    format_name: str
+    starts_at_utc: datetime
+    auditorium: int | None  # AMC types it a bare Int (introspected 2026-08-14)
+    status: str
+    is_reserved_seating: bool
+
+
+@dataclass(frozen=True)
 class SeatPage:
     """A Seat Page reduced to the domain: the Showtime it describes, plus its seats.
 

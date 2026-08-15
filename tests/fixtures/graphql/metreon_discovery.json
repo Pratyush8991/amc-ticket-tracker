@@ -1,0 +1,383 @@
+{
+ "data": {
+  "viewer": {
+   "theatre": {
+    "theatreId": 2325,
+    "name": "AMC Metreon 16",
+    "slug": "amc-metreon-16",
+    "formats": {
+     "items": [
+      {
+       "attributes": [
+        {
+         "name": "IMAX 70MM",
+         "code": "imax70mm"
+        },
+        {
+         "name": "IMAX at AMC",
+         "code": "imax"
+        },
+        {
+         "name": "70mm",
+         "code": "70mm"
+        }
+       ],
+       "groups": {
+        "edges": [
+         {
+          "node": {
+           "showtimes": {
+            "edges": [
+             {
+              "node": {
+               "showtimeId": 145377422,
+               "showDateTimeUtc": "2026-08-15T17:00:00.000Z",
+               "status": "Scheduled",
+               "auditorium": 15,
+               "isReservedSeating": true,
+               "format": null,
+               "movie": {
+                "name": "The Odyssey",
+                "slug": "the-odyssey",
+                "movieId": 76238
+               },
+               "attributes": {
+                "edges": [
+                 {
+                  "node": {
+                   "code": "imax70mm",
+                   "name": "IMAX 70MM",
+                   "sort": 8,
+                   "groups": [
+                    {
+                     "id": 3,
+                     "name": "Format"
+                    }
+                   ]
+                  }
+                 },
+                 {
+                  "node": {
+                   "code": "imax",
+                   "name": "IMAX at AMC",
+                   "sort": 11,
+                   "groups": [
+                    {
+                     "id": 3,
+                     "name": "Format"
+                    }
+                   ]
+                  }
+                 },
+                 {
+                  "node": {
+                   "code": "70mm",
+                   "name": "70mm",
+                   "sort": 23,
+                   "groups": [
+                    {
+                     "id": 3,
+                     "name": "Format"
+                    }
+                   ]
+                  }
+                 },
+                 {
+                  "node": {
+                   "code": "amcclubrockers",
+                   "name": "AMC Club Rockers",
+                   "sort": 54,
+                   "groups": [
+                    {
+                     "id": 4,
+                     "name": "Features"
+                    }
+                   ]
+                  }
+                 },
+                 {
+                  "node": {
+                   "code": "reservedseating",
+                   "name": "Reserved Seating",
+                   "sort": 170,
+                   "groups": [
+                    {
+                     "id": 2,
+                     "name": "Amenities"
+                    }
+                   ]
+                  }
+                 }
+                ]
+               }
+              }
+             }
+            ],
+            "pageInfo": {
+             "hasNextPage": false
+            }
+           }
+          }
+         },
+         {
+          "node": {
+           "showtimes": {
+            "edges": [
+             {
+              "node": {
+               "showtimeId": 145377423,
+               "showDateTimeUtc": "2026-08-16T17:00:00.000Z",
+               "status": "Scheduled",
+               "auditorium": 15,
+               "isReservedSeating": true,
+               "format": null,
+               "movie": {
+                "name": "The Odyssey",
+                "slug": "the-odyssey",
+                "movieId": 76238
+               },
+               "attributes": {
+                "edges": [
+                 {
+                  "node": {
+                   "code": "imax70mm",
+                   "name": "IMAX 70MM",
+                   "sort": 8,
+                   "groups": [
+                    {
+                     "id": 3,
+                     "name": "Format"
+                    }
+                   ]
+                  }
+                 },
+                 {
+                  "node": {
+                   "code": "imax",
+                   "name": "IMAX at AMC",
+                   "sort": 11,
+                   "groups": [
+                    {
+                     "id": 3,
+                     "name": "Format"
+                    }
+                   ]
+                  }
+                 },
+                 {
+                  "node": {
+                   "code": "reservedseating",
+                   "name": "Reserved Seating",
+                   "sort": 170,
+                   "groups": [
+                    {
+                     "id": 2,
+                     "name": "Amenities"
+                    }
+                   ]
+                  }
+                 }
+                ]
+               }
+              }
+             }
+            ],
+            "pageInfo": {
+             "hasNextPage": false
+            }
+           }
+          }
+         }
+        ],
+        "pageInfo": {
+         "hasNextPage": false
+        }
+       }
+      },
+      {
+       "attributes": [
+        {
+         "name": "IMAX at AMC",
+         "code": "imax"
+        }
+       ],
+       "groups": {
+        "edges": [
+         {
+          "node": {
+           "showtimes": {
+            "edges": [
+             {
+              "node": {
+               "showtimeId": 145377422,
+               "showDateTimeUtc": "2026-08-15T17:00:00.000Z",
+               "status": "Scheduled",
+               "auditorium": 15,
+               "isReservedSeating": true,
+               "format": null,
+               "movie": {
+                "name": "The Odyssey",
+                "slug": "the-odyssey",
+                "movieId": 76238
+               },
+               "attributes": {
+                "edges": [
+                 {
+                  "node": {
+                   "code": "imax70mm",
+                   "name": "IMAX 70MM",
+                   "sort": 8,
+                   "groups": [
+                    {
+                     "id": 3,
+                     "name": "Format"
+                    }
+                   ]
+                  }
+                 },
+                 {
+                  "node": {
+                   "code": "imax",
+                   "name": "IMAX at AMC",
+                   "sort": 11,
+                   "groups": [
+                    {
+                     "id": 3,
+                     "name": "Format"
+                    }
+                   ]
+                  }
+                 },
+                 {
+                  "node": {
+                   "code": "70mm",
+                   "name": "70mm",
+                   "sort": 23,
+                   "groups": [
+                    {
+                     "id": 3,
+                     "name": "Format"
+                    }
+                   ]
+                  }
+                 },
+                 {
+                  "node": {
+                   "code": "amcclubrockers",
+                   "name": "AMC Club Rockers",
+                   "sort": 54,
+                   "groups": [
+                    {
+                     "id": 4,
+                     "name": "Features"
+                    }
+                   ]
+                  }
+                 },
+                 {
+                  "node": {
+                   "code": "reservedseating",
+                   "name": "Reserved Seating",
+                   "sort": 170,
+                   "groups": [
+                    {
+                     "id": 2,
+                     "name": "Amenities"
+                    }
+                   ]
+                  }
+                 }
+                ]
+               }
+              }
+             }
+            ],
+            "pageInfo": {
+             "hasNextPage": false
+            }
+           }
+          }
+         }
+        ],
+        "pageInfo": {
+         "hasNextPage": false
+        }
+       }
+      },
+      {
+       "attributes": [
+        {
+         "name": "InfinityVision",
+         "code": "infinityvision"
+        }
+       ],
+       "groups": {
+        "edges": [
+         {
+          "node": {
+           "showtimes": {
+            "edges": [
+             {
+              "node": {
+               "showtimeId": 145901234,
+               "showDateTimeUtc": "2026-12-18T03:00:00.000Z",
+               "status": "OnSale",
+               "auditorium": 6,
+               "isReservedSeating": true,
+               "format": null,
+               "movie": {
+                "name": "Avengers: Doomsday",
+                "slug": "avengers-doomsday",
+                "movieId": 78500
+               },
+               "attributes": {
+                "edges": [
+                 {
+                  "node": {
+                   "code": "infinityvision",
+                   "name": "InfinityVision",
+                   "sort": 6,
+                   "groups": [
+                    {
+                     "id": 3,
+                     "name": "Format"
+                    }
+                   ]
+                  }
+                 },
+                 {
+                  "node": {
+                   "code": "reservedseating",
+                   "name": "Reserved Seating",
+                   "sort": 170,
+                   "groups": [
+                    {
+                     "id": 2,
+                     "name": "Amenities"
+                    }
+                   ]
+                  }
+                 }
+                ]
+               }
+              }
+             }
+            ],
+            "pageInfo": {
+             "hasNextPage": false
+            }
+           }
+          }
+         }
+        ],
+        "pageInfo": {
+         "hasNextPage": false
+        }
+       }
+      }
+     ]
+    }
+   }
+  }
+ }
+}

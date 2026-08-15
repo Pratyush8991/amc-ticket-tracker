@@ -134,9 +134,10 @@ checkout.
 
 ## Honest notes
 
-- **It's a scraper, so it's brittle.** If AMC changes the page shape you get a loud
-  `SeatPageShapeChanged`, never a quiet "no seats". The fix lives in
-  `src/amc_watch/fetch_core/parse.py`.
+- **It's a scraper, so it's brittle.** If AMC changes the payload shape — the RSC page or
+  the GraphQL schema — you get a loud `ShapeChanged`, never a quiet "no seats"; a
+  truncated discovery gets its own `DiscoveryIncomplete`. The fix lives in
+  `src/amc_watch/fetch_core/parse.py` and `fetch_core/graphql/`.
 - **The transport is load-bearing, and it's two-tier.** The GraphQL host
   (`graph.amctheatres.com`) 403s plain `requests` *and* `curl`; it answers only a
   browser-accurate TLS fingerprint, so discovery runs on `curl_cffi` with a warmed cookie

@@ -1,11 +1,14 @@
-"""The one outbound edge of the whole system: GET a Seat Page.
+"""One of the system's two outbound edges: GET a Seat Page.
+
+A *seat-read fallback* since ADR-0005 — never Discovery, which belongs to the GraphQL
+backend next door. It earns its keep by failing independently: a different host, a
+different transport, a different payload shape.
 
 Transport behavior here is load-bearing and ported intact from the proven single-user
 watcher (ADR-0003): python-requests with a browser User-Agent passes AMC's Cloudflare
 hardening where curl 403s. A fresh Session per fetch (requests.Session is not guaranteed
 thread-safe) and a browser Accept/Accept-Language pair are part of that behavior, not
-incidental style. Never replace this with a headless browser — AMC flags automation
-(ADR-0001).
+incidental style. Never replace this with a headless browser — AMC flags automation.
 
 This module is also the seam the test suite fakes: tests inject a session that serves
 recorded RSC payloads, so fetch → parse runs for real in every test.
@@ -17,7 +20,7 @@ from .errors import (
     AccessBlocked,
     QueueWalled,
     RateLimited,
-    SeatPageUnavailable,
+    FetchUnavailable,
     ShowtimeNotFound,
 )
 from .parse import parse_seat_page
@@ -67,13 +70,13 @@ def _classify(response, showtime_id):
     if response.status_code == 429:
         raise RateLimited("HTTP 429 — asking too often", showtime_id)
     if not response.ok:
-        raise SeatPageUnavailable(f"HTTP {response.status_code}", showtime_id)
+        raise FetchUnavailable(f"HTTP {response.status_code}", showtime_id)
 
 
 def fetch_seat_page(showtime_id, session=None, timeout=DEFAULT_TIMEOUT):
     """Fetch and parse one Seat Page.
 
-    Returns a SeatPage. Raises a SeatPageError subclass if AMC did not give us a
+    Returns a SeatPage. Raises a FetchError subclass if AMC did not give us a
     trustworthy answer — a Seat Page with every seat sold is a *successful* fetch that
     returns a SeatPage with no bookable seats, never an exception.
     """
@@ -85,7 +88,7 @@ def fetch_seat_page(showtime_id, session=None, timeout=DEFAULT_TIMEOUT):
                 seat_page_url(showtime_id), headers=HEADERS, timeout=timeout
             )
         except requests.RequestException as e:
-            raise SeatPageUnavailable(f"request failed: {e}", showtime_id) from e
+            raise FetchUnavailable(f"request failed: {e}", showtime_id) from e
         _classify(response, showtime_id)
         return parse_seat_page(response.text)
     finally:

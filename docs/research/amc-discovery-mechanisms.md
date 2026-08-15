@@ -480,3 +480,53 @@ seat-page fetcher as the fallback (different surface, fails independently).
 - `curl_cffi` (TLS impersonation): <https://github.com/lexiforest/curl_cffi>
 </content>
 </invoke>
+
+---
+
+## Addendum — live schema corrections from the fetch-core build (2026-08-14, #15)
+
+Server-side introspection and single live calls through `curl_cffi` while building the
+GraphQL backend corrected three shape assumptions above:
+
+- **`Showtime.format` is `ShowtimeMovieFormat`** (`id, attributes, groups, movie`), *not*
+  a Relay connection — the `format { edges … }` shape exists only inside the RSC page
+  embed. On live discovery rows and live `viewer.showtime` seat reads, `format` comes
+  back **null**.
+- **Where the format identity actually lives — and how to read it safely.** Every
+  showtime carries its own `attributes` AttributeConnection, and *that* is the source for
+  both discovery rows and seat reads. Do **not** take the first entry: the connection is
+  ordered by AMC's global `sort` and mixes categories, so an ordinary 2D showtime leads
+  with `reservedseating`. Each attribute carries `groups { id name }`, and AMC's own
+  categories are the discriminator:
+
+  | group | id | example codes |
+  | --- | --- | --- |
+  | **Format** | 3 | `imax70mm`(8), `imax`(11), `70mm`(23), `dolbycinemaatamcprime`(13), `laseratamc`(60), `fanfaves`(26) |
+  | Features | 4 | `reclinerseating`(54), `amcclubrockers`(54) |
+  | Amenities | 2 | `reservedseating`(170) |
+  | Accessibility | 1 | `closedcaption`(200), `descriptivevideo`(999) |
+
+  The format is the **lowest-`sort` member of group 3**; `sort` orders by specificity
+  within the group (imax70mm 8 < imax 11 < 70mm 23). A showtime with no group-3
+  attribute genuinely has no premium format — record that, don't guess. Note AMC files
+  some non-presentation things (`fanfaves`, `opencaption`, `japaneseenglishsubtitle`)
+  under Format; store what AMC says rather than second-guessing its taxonomy.
+
+  **Do not** take the format from the enclosing `formats.items[].attributes` tab: a
+  showtime is listed under several tabs (an IMAX 70MM screening appears under both the
+  IMAX 70MM and IMAX tabs), so the tab decides nothing and using it makes the recorded
+  format depend on AMC's tab ordering.
+- **`Showtime.auditorium` is a bare `Int`**, and GraphQL validation errors ride the body
+  of an HTTP **400** — read the body before trusting the status code.
+- **Nested connections are capped, not paged.** `groups(first: N)` / `showtimes(first: N)`
+  answer a truncated list with `hasNextPage: true` and no complaint. Select `pageInfo` and
+  treat truncation as a failure — a partial discovery is a Registry silently missing
+  Showtimes.
+
+Confirmed live the same day, residential IP: discovery returned **69 showtimes** for
+`amc-metreon-16` (business date via the session cookie), every row format-attributed, and
+the seat read for a row agreed with discovery on its format code. Plain `requests` still
+403s the host with a Cloudflare challenge; `curl_cffi` (chrome impersonation, warmed jar)
+passes. Re-record fixtures with `tools/record_graphql_fixtures.py` rather than hand-writing
+them — every correction on this list came from real payloads disagreeing with an
+assumption.
